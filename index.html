@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura PDF App</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1><i class="fas fa-file-pdf"></i> Aura PDF App</h1>
+
+            </div>
+        </header>
+
+        <!-- Breadcrumb Navigation -->
+        <nav class="breadcrumb-nav">
+            <div class="breadcrumb-content">
+                <span class="breadcrumb-item active" id="breadcrumb-main">
+                    <i class="fas fa-home"></i> Home
+                </span>
+                <span class="breadcrumb-separator">/</span>
+                <span class="breadcrumb-item" id="breadcrumb-current">Files</span>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            
+            <!-- Tab Navigation -->
+            <nav class="tab-navigation">
+                <button class="tab-button" data-tab="bulk">
+                    <i class="fas fa-edit"></i>
+                    <span>Bulk</span>
+                </button>
+                <button class="tab-button" data-tab="split">
+                    <i class="fas fa-cut"></i>
+                    <span>Split</span>
+                </button>
+                <button class="tab-button active" data-tab="files">
+                    <i class="fas fa-folder"></i>
+                    <span>Files & Patterns</span>
+                </button>
+                <button class="tab-button" data-tab="settings">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
+                </button>
+            </nav>
+
+            <!-- Tab Content -->
+            <div class="tab-content">
+
+
+
+
+                <!-- Bulk Tab -->
+                <div class="tab-pane" id="bulk-tab">
+                    <div class="bulk-layout">
+                        <div class="bulk-actions">
+                            <h3><i class="fas fa-edit"></i> Bulk Rename Operations</h3>
+                            <p>Rename multiple files using patterns, sequences, or prefixes</p>
+                            
+                            <!-- File Loading Section -->
+                            <div class="file-loading-section">
+                                <h4><i class="fas fa-folder-open"></i> Load PDF Files</h4>
+                                <p>Load PDF files to perform bulk rename operations on them</p>
+                                <div class="file-loading-actions">
+                                    <button class="btn btn-primary btn-block" id="bulkLoadPdfBtn">
+                                        <i class="fas fa-folder-open"></i> Load PDF Files
+                                    </button>
+                                    <button class="btn btn-secondary btn-block" id="bulkSelectFolderBtn">
+                                        <i class="fas fa-folder"></i> Select Folder
+                                    </button>
+                                    <button class="btn btn-outline btn-block" id="bulkClearFilesBtn">
+                                        <i class="fas fa-trash"></i> Clear Files
+                                    </button>
+                                </div>
+                                
+                                <!-- Bulk Tab File List -->
+                                <div class="file-list-section">
+                                    <h5 id="bulkLoadedFilesHeader">Loaded Files:</h5>
+                                    <div class="file-list" id="bulkFileList">
+                                        <div class="empty-files">
+                                            <p>No PDF files loaded for bulk rename</p>
+                                            <p>Click "Load PDF Files" to get started</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Additional Words Input -->
+                                <div class="additional-words-section">
+                                    <h5>Additional Words:</h5>
+                                    <div class="form-group">
+                                        <input type="text" id="additionalWords" placeholder="Enter additional words to add to filenames" class="form-control">
+                                    </div>
+                                </div>
+                                
+                                <!-- Pattern Selection -->
+                                <div class="pattern-selection-section">
+                                    <h5>Select Patterns to Use:</h5>
+                                    <div id="patternSelectionContainer" class="pattern-checkboxes">
+                                        <p class="no-patterns">No patterns available. Please create patterns in the Files & Patterns tab first.</p>
+                                    </div>
+                                </div>
+                                
+                                <!-- Bulk Rename Preview -->
+                                <div class="bulk-rename-preview">
+                                    <h5>Rename Preview:</h5>
+                                    <div id="bulkRenamePreview" class="preview-content">
+                                        No patterns available
+                                    </div>
+                                </div>
+                            </div>
+                            
+
+                            
+                            <div class="bulk-action-cards">
+                                <div class="action-card">
+                                    <div class="card-header">
+                                        <i class="fas fa-edit"></i>
+                                        <h4>Bulk Rename</h4>
+                                    </div>
+                                    <p>Rename multiple files using patterns, sequences, or prefixes</p>
+                                    <button class="btn btn-primary btn-block" id="bulkRenameBtnBulk" disabled>
+                                        <i class="fas fa-edit"></i> Start Bulk Rename
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Split Tab -->
+                <div class="tab-pane" id="split-tab">
+                    <div class="split-layout">
+                        <div class="split-content">
+                            <div class="split-header">
+                                <h3><i class="fas fa-cut"></i> PDF Splitting</h3>
+                                <p>Split large PDFs into smaller files and download as ZIP</p>
+                            </div>
+                            
+                            <!-- File Loading Section -->
+                            <div class="file-loading-section">
+                                <h4><i class="fas fa-folder-open"></i> Load PDF Files</h4>
+                                <p>Load PDF files to split them into smaller parts</p>
+                                <div class="file-loading-actions">
+                                    <button class="btn btn-primary btn-block" id="splitLoadPdfBtn">
+                                        <i class="fas fa-folder-open"></i> Load PDF File
+                                    </button>
+                                    <button class="btn btn-outline btn-block" id="splitClearFilesBtn">
+                                        <i class="fas fa-trash"></i> Clear File
+                                    </button>
+                                </div>
+                                
+                                <!-- Split Tab File List -->
+                                <div class="file-list-section">
+                                    <h5>Loaded File:</h5>
+                                    <div class="file-list" id="splitFileList">
+                                        <div class="empty-files">
+                                            <p>No PDF file loaded for splitting</p>
+                                            <p>Click "Load PDF File" to get started</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Split Options -->
+                            <div class="split-options-section">
+                                <div class="split-options">
+                                    <h4><i class="fas fa-cog"></i> Split Options</h4>
+                                    
+                                    <div class="form-group">
+                                        <label for="startPage">Start Page:</label>
+                                        <input type="number" id="startPage" min="1" value="1" placeholder="Start page number" class="form-control">
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="endPage">End Page:</label>
+                                        <input type="number" id="endPage" min="1" placeholder="End page number" class="form-control">
+                                    </div>
+                                    
+                                    <div class="split-actions">
+                                        <button class="btn btn-primary" id="splitAllBtn" disabled>
+                                            <i class="fas fa-cut"></i> Split All Pages
+                                        </button>
+                                        <button class="btn btn-info" id="splitRangeBtn" disabled>
+                                            <i class="fas fa-cut"></i> Split Page Range
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Download Actions -->
+                                    <div class="download-actions" style="margin-top: 15px;">
+                                        <h5><i class="fas fa-download"></i> Download Options</h5>
+                                        <button class="btn btn-success" id="downloadIndividualBtn" disabled>
+                                            <i class="fas fa-file-pdf"></i> Download Individual Files
+                                        </button>
+                                        <button class="btn btn-warning" id="downloadZipBtn" disabled>
+                                            <i class="fas fa-file-archive"></i> Download as ZIP
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Results Display -->
+                                    <div class="results-display" style="margin-top: 15px;">
+                                        <h5><i class="fas fa-list"></i> Split Results</h5>
+                                        <div id="resultsList">
+                                            <p>No split results yet</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Files & Patterns Tab -->
+                <div class="tab-pane active" id="files-tab">
+                    <div class="files-layout">
+                        <div class="files-sidebar">
+                            <div class="sidebar-section">
+                                <h4>File Operations</h4>
+                                <button class="btn btn-primary btn-block" id="openFilesBtn">
+                                    <i class="fas fa-folder-open"></i> Open PDF Files
+                                </button>
+                                <button class="btn btn-secondary btn-block" id="selectFolderBtn">
+                                    <i class="fas fa-folder"></i> Select Folder
+                                </button>
+                                <button class="btn btn-info btn-block" id="bulkRenameBtn">
+                                    <i class="fas fa-edit"></i> Bulk Rename
+                                </button>
+                                <button class="btn btn-warning btn-block" id="clearAllBtn">
+                                    <i class="fas fa-trash"></i> Clear All Files
+                                </button>
+                            </div>
+                            
+                            <div class="sidebar-section">
+                                <h4>File List</h4>
+                                <div class="file-list" id="fileList">
+                                    <div class="empty-files">
+                                        <p>No PDF files loaded</p>
+                                        <p>Click "Open PDF Files" to get started</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="sidebar-section">
+                                <h4>Pattern Actions</h4>
+                                <button class="btn btn-secondary btn-block" id="reloadPatternsBtn">
+                                    <i class="fas fa-sync"></i> Reload Patterns
+                                </button>
+                            </div>
+                            
+                            <div class="sidebar-section">
+                                <h4>Saved Patterns</h4>
+                                <div class="pattern-list" id="patternList">
+                                    <div class="empty-patterns">
+                                        <p>No patterns saved</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="files-main">
+                            <div class="pdf-viewer-section">
+                                <div class="pdf-preview-container" id="pdfPreviewContainer">
+                                    <div class="preview-header">
+                                        <div class="preview-title">
+                                            <h5 id="currentFileName">Select a PDF to preview</h5>
+                                        </div>
+                                        <div class="preview-controls">
+                                            <button class="btn btn-sm" id="prevPageBtn" disabled>
+                                                <i class="fas fa-chevron-left"></i> Previous
+                                            </button>
+                                            <span class="page-info">
+                                                Page <span id="currentPage">-</span> of <span id="totalPages">-</span>
+                                            </span>
+                                            <button class="btn btn-sm" id="nextPageBtn" disabled>
+                                                Next <i class="fas fa-chevron-right"></i>
+                                            </button>
+                                            <div class="zoom-controls">
+                                                <button class="btn btn-sm" id="zoomOutBtn">
+                                                    <i class="fas fa-search-minus"></i>
+                                                </button>
+                                                <span id="zoomLevel">100%</span>
+                                                <button class="btn btn-sm" id="zoomInBtn">
+                                                    <i class="fas fa-search-plus"></i>
+                                                </button>
+                                            </div>
+                                            <div class="selection-mode-toggle">
+                                                <button class="btn btn-sm btn-info" id="toggleSelectionMode">
+                                                    <i class="fas fa-crosshairs"></i> Selection Mode
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="pdf-preview-wrapper">
+                                        <div class="pdf-preview" id="pdfPreview">
+                                            <div class="no-pdf-selected">
+                                                <i class="fas fa-file-pdf fa-3x"></i>
+                                                <p>No PDF selected</p>
+                                                <p>Select a file from the list to preview</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="selection-overlay" id="selectionOverlay">
+                                            <canvas class="selection-canvas" id="selectionCanvas"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Selection Details Display -->
+                                <div class="selection-details" id="selectionDetails" style="display: none;">
+                                    <h4><i class="fas fa-info-circle"></i> Selection Details</h4>
+                                    <div class="selection-info">
+                                        <p><strong>Page:</strong> <span id="selectedPage">-</span></p>
+                                        <p><strong>Position:</strong> <span id="selectedPosition">No selection</span></p>
+                                        <p><strong>Size:</strong> <span id="selectedSize">-</span></p>
+                                        <p><strong>Extracted Text:</strong> <span id="extractedTextPreview">Make a selection above to extract text</span></p>
+                                    </div>
+                                </div>
+
+                                <!-- Pattern Creation Form (appears after selection) -->
+                                <div class="pattern-creation-form" id="patternCreationForm" style="display: none;">
+                                    <div class="panel-container">
+                                        <div class="panel" id="renamePanel">
+                                            <!-- Rename panel content -->
+                                        </div>
+                                        <div class="panel" id="patternCreationPanel">
+                                            <!-- Pattern creation panel content -->
+                                        </div>
+                                    </div>
+                                    <h4><i class="fas fa-plus"></i> Create New Pattern</h4>
+                                    <div class="form-group">
+                                        <label for="newPatternName">Pattern Name:</label>
+                                        <input type="text" id="newPatternName" placeholder="Enter pattern name" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="patternDescription">Description (optional):</label>
+                                        <textarea id="patternDescription" placeholder="Describe what this pattern extracts" class="form-control" rows="2"></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="manualPatternText">Manual Text Entry (optional):</label>
+                                        <input type="text" id="manualPatternText" placeholder="Enter text manually if auto-extraction fails" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>
+                                            <input type="checkbox" id="cleanPatternText" checked>
+                                            Clean extracted text (remove extra spaces, punctuation)
+                                        </label>
+                                    </div>
+                                    
+                                    <!-- Pattern Preview -->
+                                    <div class="pattern-preview-section" id="patternPreviewSection">
+                                        <div class="preview-content">
+                                            Make a selection to see pattern preview
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-actions">
+                                        <button class="btn btn-success" id="saveVisualPatternBtn" disabled>
+                                            <i class="fas fa-save"></i> Save Pattern
+                                        </button>
+                                        <button class="btn btn-secondary" id="cancelPatternBtn">
+                                            <i class="fas fa-times"></i> Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <!-- Settings Tab -->
+                <div class="tab-pane" id="settings-tab">
+                    <div class="settings-layout">
+                        <div class="settings-header">
+                            <h3><i class="fas fa-cog"></i> Application Settings</h3>
+                            <p>Configure your Aura PDF App preferences</p>
+                        </div>
+                        
+                        <div class="settings-content">
+                            <div class="settings-section">
+                                <h4>General Settings</h4>
+                                <div class="setting-item">
+                                    <label>Default Separator:</label>
+                                    <input type="text" value="_" placeholder="Default separator for pattern combinations">
+                                </div>
+                                <div class="setting-item">
+                                    <label>Auto-save Patterns:</label>
+                                    <input type="checkbox" checked>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-section">
+                                <h4>File Handling</h4>
+                                <div class="setting-item">
+                                    <label>Backup Original Files:</label>
+                                    <input type="checkbox" checked>
+                                </div>
+                                <div class="setting-item">
+                                    <label>Default Output Directory:</label>
+                                    <input type="text" placeholder="Leave empty for same directory">
+                                </div>
+                            </div>
+                            
+                            <div class="settings-section">
+                                <h4>Interface</h4>
+                                <div class="setting-item">
+                                    <label>Theme:</label>
+                                    <select>
+                                        <option>Light</option>
+                                        <option>Dark</option>
+                                        <option>Auto</option>
+                                    </select>
+                                </div>
+                                <div class="setting-item">
+                                    <label>Show Tooltips:</label>
+                                    <input type="checkbox" checked>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Status Bar -->
+        <footer class="status-bar">
+            <div class="status-info">
+                <span id="statusText">Ready</span>
+            </div>
+            <div class="app-info">
+                <span>Aura PDF App v1.0.0</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modals -->
+    <!-- Bulk Rename Modal -->
+    <div class="modal" id="bulkRenameModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit"></i> Bulk Rename Files</h3>
+                <button class="modal-close" onclick="closeBulkRenameModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="bulk-options">
+                    <div class="option-group">
+                        <h4>Naming Strategy</h4>
+                        <label class="radio-option">
+                            <input type="radio" name="namingStrategy" value="pattern" checked>
+                            <span>Use Saved Pattern</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="namingStrategy" value="sequence">
+                            <span>Sequential Numbering</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="namingStrategy" value="prefix">
+                            <span>Add Prefix/Suffix</span>
+                        </label>
+
+                    </div>
+                    
+                    <div class="pattern-selection" id="patternSelection">
+                        <label for="selectedPattern">Select Pattern:</label>
+                        <select id="selectedPattern">
+                            <option value="">Choose a pattern...</option>
+                        </select>
+                        
+                        <div class="pattern-combination">
+                            <label>Combine with additional patterns:</label>
+                            <div class="pattern-combination-controls">
+                                <select id="secondPattern" class="pattern-select">
+                                    <option value="-1">No second pattern</option>
+                                </select>
+                                <select id="thirdPattern" class="pattern-select">
+                                    <option value="-1">No third pattern</option>
+                                </select>
+                            </div>
+                            <div class="combination-separator">
+                                <label for="patternSeparator">Separator:</label>
+                                <input type="text" id="patternSeparator" value="_" placeholder="e.g., _ or - or space" maxlength="5">
+                            </div>
+                            <div class="additional-words">
+                                <label for="additionalWords">Additional Words:</label>
+                                <input type="text" id="additionalWords" placeholder="e.g., Draft, Final, 2024, etc.">
+                                <small>Words to add to the end of extracted patterns</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="sequence-options" id="sequenceOptions" style="display: none;">
+                        <label for="sequencePrefix">Prefix:</label>
+                        <input type="text" id="sequencePrefix" placeholder="e.g., Document_">
+                        <label for="sequenceStart">Start Number:</label>
+                        <input type="number" id="sequenceStart" value="1" min="1">
+                    </div>
+                    
+                    <div class="prefix-options" id="prefixOptions" style="display: none;">
+                        <label for="namePrefix">Prefix:</label>
+                        <input type="text" id="namePrefix" placeholder="Add to beginning">
+                        <label for="nameSuffix">Suffix:</label>
+                        <input type="text" id="nameSuffix" placeholder="Add to end">
+                    </div>
+                    
+
+                </div>
+                
+                <div class="preview-section">
+                    <h4>Preview</h4>
+                    <div class="rename-preview" id="renamePreview">
+                        <!-- Preview will be shown here -->
+                    </div>
+                </div>
+                
+                <div class="progress-section" id="progressSection" style="display: none;">
+                    <h4>Progress</h4>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-text" id="progressText">Ready to start</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeBulkRenameModal()">Cancel</button>
+                <button class="btn btn-warning" id="resetBulkRenameBtn">
+                    <i class="fas fa-undo"></i> Reset
+                </button>
+                <button class="btn btn-primary" id="executeBulkRename">
+                    <i class="fas fa-check"></i> Rename All Files
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Split PDF Modal -->
+    <div class="modal" id="splitModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-cut"></i> Split PDF</h3>
+                <button class="modal-close" onclick="closeSplitModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="split-options">
+                    <div class="form-group">
+                        <label for="splitFile">Select PDF to Split:</label>
+                        <select id="splitFile">
+                            <option value="">Choose a PDF file...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="pagesPerFile">Pages per File:</label>
+                        <input type="number" id="pagesPerFile" value="1" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="outputDirectory">Output Directory:</label>
+                        <div class="input-group">
+                            <input type="text" id="outputDirectory" readonly placeholder="Select output directory">
+                            <button class="btn btn-secondary" id="selectOutputDir">Browse</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="createZip">
+                            Create ZIP archive of split files
+                        </label>
+                    </div>
+                    </div>
+                    
+                    <div class="split-info" id="splitInfo">
+                        <!-- Split information will be shown here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeSplitModal()">Cancel</button>
+                <button class="btn btn-primary" id="executeSplit">
+                    <i class="fas fa-cut"></i> Split PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        // Fallback if primary CDN fails
+        if (typeof pdfjsLib === 'undefined') {
+            console.log('Primary CDN failed, trying fallback...');
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js';
+            script.onload = () => console.log('PDF.js loaded from fallback CDN');
+            script.onerror = () => console.error('All PDF.js CDNs failed');
+            document.head.appendChild(script);
+        }
+    </script>
+    
+    <!-- PDF-lib library for PDF manipulation -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    
+    <!-- JSZip library for creating ZIP files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="js/tab-managers.js"></script>
+    <script src="js/files-patterns-tab-manager.js"></script>
+    <script src="js/bulk-tab-manager.js"></script>
+    <script src="js/split-tab-manager.js"></script>
+    <script src="js/pdf-viewer.js"></script>
+    <script src="js/interactive-pdf-viewer.js"></script>
+    <script src="js/pattern-manager.js"></script>
+    <script src="js/bulk-operations.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        // Set up electronAPI for IPC communication
+        if (typeof require !== 'undefined') {
+            console.log('Require is available, setting up Electron API...');
+            const { ipcRenderer } = require('electron');
+            console.log('ipcRenderer obtained:', !!ipcRenderer);
+            
+            window.electronAPI = {
+                showOpenDialog: (options) => ipcRenderer.invoke('open-file-dialog', options),
+                showSaveDialog: (options) => ipcRenderer.invoke('save-file-dialog', options),
+                readFile: (filePath) => ipcRenderer.invoke('read-pdf-file', filePath),
+                writeFile: (filePath, buffer) => ipcRenderer.invoke('write-pdf-file', filePath, buffer),
+                getFileStats: (filePath) => ipcRenderer.invoke('get-file-stats', filePath),
+                getPdfFilesFromFolder: (folderPath) => ipcRenderer.invoke('get-pdf-files-from-folder', folderPath),
+                renameFile: (oldPath, newPath) => ipcRenderer.invoke('rename-file', oldPath, newPath),
+                splitPdf: (filePath, outputDir, pagesPerFile, createZip, startPage, endPage) => 
+                    ipcRenderer.invoke('split-pdf', filePath, outputDir, pagesPerFile, createZip, startPage, endPage),
+                selectDirectory: () => ipcRenderer.invoke('select-directory'),
+                downloadFile: (filePath, downloadName) => ipcRenderer.invoke('download-file', filePath, downloadName),
+                createZip: (files, outputPath) => ipcRenderer.invoke('create-zip', files, outputPath),
+                fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath),
+                getAppInfo: () => ipcRenderer.invoke('get-app-info')
+            };
+            
+            console.log('Electron API set up successfully');
+            console.log('window.electronAPI available:', !!window.electronAPI);
+            console.log('window.electronAPI.readFile available:', !!window.electronAPI.readFile);
+        } else {
+            console.log('Not running in Electron environment');
+        }
+        
+        // Initialize tab managers and app in proper order
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing tab managers...');
+            
+            // Wait a bit for all scripts to be ready
+            setTimeout(() => {
+                console.log('Initializing main app...');
+                if (typeof PDFRenamerApp !== 'undefined') {
+                    window.app = new PDFRenamerApp();
+                } else {
+                    console.error('PDFRenamerApp not found');
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>

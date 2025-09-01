@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pattern Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; }
+        .result { margin: 10px 0; padding: 10px; background: #f0f0f0; }
+        button { padding: 10px 20px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Pattern Functionality Test</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Pattern Loading</h2>
+        <button onclick="testPatternLoading()">Test Pattern Loading</button>
+        <div id="patternLoadingResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 2: Bulk Operations Integration</h2>
+        <button onclick="testBulkOperations()">Test Bulk Operations</button>
+        <div id="bulkOperationsResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 3: Pattern Combination</h2>
+        <button onclick="testPatternCombination()">Test Pattern Combination</button>
+        <div id="patternCombinationResult" class="result"></div>
+    </div>
+
+    <script>
+        function testPatternLoading() {
+            const result = document.getElementById('patternLoadingResult');
+            try {
+                if (window.app && window.app.patterns) {
+                    result.innerHTML = `✅ Patterns loaded: ${window.app.patterns.length} patterns found`;
+                    if (window.app.patterns.length > 0) {
+                        result.innerHTML += `<br>Patterns: ${window.app.patterns.map(p => p.name).join(', ')}`;
+                    }
+                } else {
+                    result.innerHTML = '❌ No patterns found or app not initialized';
+                }
+            } catch (error) {
+                result.innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+        
+        function testBulkOperations() {
+            const result = document.getElementById('bulkOperationsResult');
+            try {
+                if (window.bulkOperations) {
+                    result.innerHTML = '✅ Bulk operations initialized successfully';
+                } else {
+                    result.innerHTML = '❌ Bulk operations not initialized';
+                }
+            } catch (error) {
+                result.innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+        
+        function testPatternCombination() {
+            const result = document.getElementById('patternCombinationResult');
+            try {
+                if (window.app && window.app.patterns && window.app.patterns.length >= 2) {
+                    const pattern1 = window.app.patterns[0];
+                    const pattern2 = window.app.patterns[1];
+                    
+                    result.innerHTML = `✅ Pattern combination test:<br>
+                        Pattern 1: ${pattern1.name} (${pattern1.type})<br>
+                        Pattern 2: ${pattern2.name} (${pattern2.type})<br>
+                        Can combine: ${pattern1 && pattern2 ? 'Yes' : 'No'}`;
+                } else {
+                    result.innerHTML = '❌ Need at least 2 patterns to test combination';
+                }
+            } catch (error) {
+                result.innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+        
+        // Auto-run tests when page loads
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testPatternLoading();
+                testBulkOperations();
+                testPatternCombination();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
