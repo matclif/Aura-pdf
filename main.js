@@ -17,24 +17,43 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
       enableRemoteModule: true,
-      webSecurity: false
+      webSecurity: false,
+      backgroundThrottling: false
     },
     icon: path.join(__dirname, 'assets', 'icon.png'),
     titleBarStyle: 'default',
-    show: false
+    show: false,
+    backgroundColor: '#ffffff',
+    title: 'PDF Renamer & Splitter'
   });
 
-  // Load the app
-  mainWindow.loadFile('index.html');
+  // Prevent multiple instances
+  if (mainWindow.isDestroyed()) {
+    return;
+  }
 
-  // Show window when ready
+  // Load the app with error handling
+  mainWindow.loadFile('index.html').catch((error) => {
+    console.error('Failed to load index.html:', error);
+    mainWindow.loadURL('data:text/html,<h1>Loading Error</h1><p>Failed to load the application.</p>');
+  });
+
+  // Show window when ready with additional checks
   mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
+    if (!mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
   });
 
-  // Emitted when the window is closed
+  // Handle window closed
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+
+  // Handle page load errors
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error('Page failed to load:', errorCode, errorDescription);
   });
 
   // Development tools
@@ -43,20 +62,38 @@ function createWindow() {
   }
 }
 
-// App event handlers
-app.whenReady().then(createWindow);
+// Prevent multiple instances
+const gotTheLock = app.requestSingleInstanceLock();
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    // Someone tried to run a second instance, focus our window instead
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
 
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
-});
+  // App event handlers
+  app.whenReady().then(() => {
+    // Add a small delay to ensure everything is ready
+    setTimeout(createWindow, 100);
+  });
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      app.quit();
+    }
+  });
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+}
 
 // Create application menu
 const createMenu = () => {
@@ -212,10 +249,33 @@ ipcMain.handle('get-pdf-files-from-folder', async (event, folderPath) => {
   }
 });
 
-// Rename file
+// Rename file (handles cross-device operations)
 ipcMain.handle('rename-file', async (event, oldPath, newPath) => {
   try {
-    await fs.promises.rename(oldPath, newPath);
+    // Check if source and destination are on different drives
+    const oldDrive = path.parse(oldPath).root;
+    const newDrive = path.parse(newPath).root;
+    
+    if (oldDrive !== newDrive) {
+      // Cross-device operation: copy then delete
+      console.log('Cross-device rename detected, using copy + delete method');
+      
+      // Ensure destination directory exists
+      const destDir = path.dirname(newPath);
+      await fs.promises.mkdir(destDir, { recursive: true });
+      
+      // Copy file to new location
+      await fs.promises.copyFile(oldPath, newPath);
+      
+      // Delete original file
+      await fs.promises.unlink(oldPath);
+      
+      console.log('Cross-device rename completed successfully');
+    } else {
+      // Same device: use regular rename
+      await fs.promises.rename(oldPath, newPath);
+    }
+    
     return { success: true };
   } catch (error) {
     console.error('Error renaming file:', error);
