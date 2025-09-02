@@ -620,9 +620,13 @@ class BulkTabManager {
                 if (newName) {
                     console.log('Bulk Tab: Generated new name:', newName);
                     // Construct the full new path by replacing the filename in the original path
-                    const pathParts = file.path.split('/');
+                    // Handle both Windows (\) and Unix (/) path separators
+                    const pathSeparator = file.path.includes('\\') ? '\\' : '/';
+                    const pathParts = file.path.split(pathSeparator);
                     const fileName = pathParts.pop(); // Remove the old filename
-                    const newPath = pathParts.join('/') + '/' + newName;
+                    const newPath = pathParts.join(pathSeparator) + pathSeparator + newName;
+                    console.log('Bulk Tab: Original path:', file.path);
+                    console.log('Bulk Tab: New path:', newPath);
                     await this.renameFile(file.path, newPath);
                     successCount++;
                 } else {
