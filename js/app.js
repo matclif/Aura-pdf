@@ -153,17 +153,18 @@ class AuraPDFApp {
         const element = document.getElementById(elementId);
         if (element) {
             element.addEventListener(eventType, handler);
-        } else if (retryCount < 3) {
+        } else if (retryCount < 2) {
             // Retry after a short delay for elements that might not be loaded yet
             setTimeout(() => {
                 this.bindElement(elementId, eventType, handler, retryCount + 1);
-            }, 100);
+            }, 200);
         } else {
-            // Only log warning for elements that are expected to exist
-            const expectedElements = ['bulk', 'split', 'files', 'settings', 'renameBtn', 'downloadBtn', 'newFileName'];
-            if (expectedElements.includes(elementId)) {
-                console.warn(`Element with id '${elementId}' not found after retries, skipping event binding`);
+            // Only log warning for critical elements that should always exist
+            const criticalElements = ['bulk', 'split', 'files', 'settings'];
+            if (criticalElements.includes(elementId)) {
+                console.warn(`Critical element with id '${elementId}' not found after retries, skipping event binding`);
             }
+            // Silently skip other elements as they might be tab-specific
         }
     }
     
