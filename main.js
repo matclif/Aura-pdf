@@ -538,7 +538,12 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
         const archive = archiver('zip', { 
           zlib: { level: 9 },
           forceLocalTime: true,
-          forceZip64: false
+          forceZip64: false,
+          // Windows compatibility settings
+          statConcurrency: 1,
+          highWaterMark: 1024 * 1024, // 1MB buffer
+          // Ensure Windows-compatible file names
+          namePrependSlash: false
         });
         
         await new Promise((resolve, reject) => {
@@ -586,7 +591,17 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
             if (fs.existsSync(result.path)) {
               const stats = fs.statSync(result.path);
               console.log('File size:', stats.size, 'bytes');
-              archive.file(result.path, { name: result.fileName });
+              
+              // Sanitize file name for Windows compatibility
+              const sanitizedName = sanitizeFileName(result.fileName);
+              console.log('Sanitized file name:', sanitizedName);
+              
+              archive.file(result.path, { 
+                name: sanitizedName,
+                // Windows compatibility options
+                mode: 0o644, // Standard file permissions
+                date: new Date() // Use current date
+              });
               filesAdded++;
             } else {
               console.error('File does not exist:', result.path);
@@ -615,6 +630,17 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
             console.error('ZIP file is empty, trying alternative method...');
             // Try alternative ZIP creation method
             await createZipAlternative(results, zipPath);
+          } else {
+            // Test ZIP file integrity
+            console.log('Testing ZIP file integrity...');
+            try {
+              await testZipIntegrity(zipPath);
+              console.log('ZIP file integrity test passed');
+            } catch (integrityError) {
+              console.error('ZIP file integrity test failed:', integrityError);
+              console.log('Trying Windows-compatible ZIP creation...');
+              await createWindowsCompatibleZip(results, zipPath);
+            }
           }
         } else {
           throw new Error('ZIP file was not created');
@@ -660,6 +686,101 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
   }
 });
 
+// Test ZIP file integrity
+async function testZipIntegrity(zipPath) {
+  return new Promise((resolve, reject) => {
+    const yauzl = require('yauzl');
+    yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
+      if (err) {
+        reject(new Error(`ZIP file cannot be opened: ${err.message}`));
+        return;
+      }
+      
+      let entryCount = 0;
+      zipfile.readEntry();
+      
+      zipfile.on('entry', (entry) => {
+        entryCount++;
+        zipfile.readEntry();
+      });
+      
+      zipfile.on('end', () => {
+        if (entryCount === 0) {
+          reject(new Error('ZIP file contains no entries'));
+        } else {
+          console.log(`ZIP file contains ${entryCount} entries`);
+          resolve();
+        }
+      });
+      
+      zipfile.on('error', (err) => {
+        reject(new Error(`ZIP file error: ${err.message}`));
+      });
+    });
+  });
+}
+
+// Create Windows-compatible ZIP using yazl (if available)
+async function createWindowsCompatibleZip(results, zipPath) {
+  try {
+    console.log('Creating Windows-compatible ZIP...');
+    
+    // Try using yazl for maximum Windows compatibility
+    const yazl = require('yazl');
+    const zipfile = new yazl.ZipFile();
+    
+    // Add files to ZIP
+    results.forEach(result => {
+      if (fs.existsSync(result.path)) {
+        const sanitizedName = sanitizeFileName(result.fileName);
+        zipfile.addFile(result.path, sanitizedName);
+        console.log(`Added to Windows ZIP: ${sanitizedName}`);
+      }
+    });
+    
+    // Create the ZIP file
+    await new Promise((resolve, reject) => {
+      zipfile.outputStream.pipe(fs.createWriteStream(zipPath))
+        .on('close', () => {
+          console.log('Windows-compatible ZIP created successfully');
+          resolve();
+        })
+        .on('error', reject);
+      
+      zipfile.end();
+    });
+    
+  } catch (error) {
+    console.error('Windows-compatible ZIP creation failed:', error);
+    throw error;
+  }
+}
+
+// Sanitize file name for Windows compatibility
+function sanitizeFileName(fileName) {
+  // Remove or replace characters that are problematic on Windows
+  let sanitized = fileName
+    .replace(/[<>:"/\\|?*]/g, '_') // Replace invalid characters with underscore
+    .replace(/\s+/g, '_') // Replace spaces with underscores
+    .replace(/[^\w\-_\.]/g, '_') // Keep only word chars, hyphens, underscores, and dots
+    .replace(/_+/g, '_') // Replace multiple underscores with single
+    .replace(/^_|_$/g, ''); // Remove leading/trailing underscores
+  
+  // Ensure it doesn't start with a dot (hidden files)
+  if (sanitized.startsWith('.')) {
+    sanitized = 'file_' + sanitized;
+  }
+  
+  // Limit length for Windows compatibility
+  if (sanitized.length > 100) {
+    const ext = path.extname(sanitized);
+    const name = path.basename(sanitized, ext);
+    sanitized = name.substring(0, 100 - ext.length) + ext;
+  }
+  
+  return sanitized || 'unnamed_file.pdf';
+}
+
 // Alternative ZIP creation method using JSZip (if available)
 async function createZipAlternative(results, zipPath) {
   try {
@@ -688,7 +809,10 @@ async function createZipAlternative(results, zipPath) {
     const output = fs.createWriteStream(zipPath);
     const archive = archiver('zip', { 
       zlib: { level: 1 }, // Lower compression
-      forceLocalTime: true
+      forceLocalTime: true,
+      forceZip64: false,
+      statConcurrency: 1,
+      namePrependSlash: false
     });
     
     await new Promise((resolve, reject) => {
@@ -700,7 +824,12 @@ async function createZipAlternative(results, zipPath) {
       
       results.forEach(result => {
         if (fs.existsSync(result.path)) {
-          archive.file(result.path, { name: result.fileName });
+          const sanitizedName = sanitizeFileName(result.fileName);
+          archive.file(result.path, { 
+            name: sanitizedName,
+            mode: 0o644,
+            date: new Date()
+          });
         }
       });
       
