@@ -42,81 +42,15 @@ function createWindow() {
     return;
   }
 
-  // Show window immediately with loading screen
+  // Show window immediately
   mainWindow.show();
   
-  // Load a loading screen first
-  const loadingHTML = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Aura PDF App - Loading</title>
-      <style>
-        body {
-          margin: 0;
-          padding: 0;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          height: 100vh;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          color: white;
-        }
-        .loading-container {
-          text-align: center;
-          animation: fadeIn 1s ease-in;
-        }
-        .logo {
-          font-size: 3rem;
-          font-weight: bold;
-          margin-bottom: 1rem;
-          text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-        .spinner {
-          border: 4px solid rgba(255,255,255,0.3);
-          border-radius: 50%;
-          border-top: 4px solid white;
-          width: 50px;
-          height: 50px;
-          animation: spin 1s linear infinite;
-          margin: 0 auto 1rem;
-        }
-        .loading-text {
-          font-size: 1.2rem;
-          opacity: 0.9;
-        }
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="loading-container">
-        <div class="logo">Aura PDF</div>
-        <div class="spinner"></div>
-        <div class="loading-text">Loading your PDF tools...</div>
-      </div>
-    </body>
-    </html>
-  `;
-  
-  mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(loadingHTML)}`);
-
-  // Load the actual app after a short delay
-  setTimeout(() => {
-    if (!mainWindow.isDestroyed()) {
-      mainWindow.loadFile('index.html').catch((error) => {
-        console.error('Failed to load index.html:', error);
-        mainWindow.loadURL('data:text/html,<h1>Loading Error</h1><p>Failed to load the application.</p>');
-      });
-    }
-  }, 150); // Further reduced delay for faster loading
+  // Load the main HTML file directly
+  mainWindow.loadFile('index.html').catch((error) => {
+    console.error('Failed to load index.html:', error);
+    // Fallback to simple error page
+    mainWindow.loadURL('data:text/html,<h1>Loading Error</h1><p>Failed to load the application.</p>');
+  });
 
   // Show window when ready with additional checks
   mainWindow.once('ready-to-show', () => {
@@ -520,6 +454,23 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
     let zipPath = null;
     if (createZip) {
       try {
+        console.log('=== STARTING ZIP CREATION ===');
+        console.log('Results array:', results);
+        console.log('Results length:', results.length);
+        
+        // yazl is already tested and working
+        
+        // Verify all files exist before creating ZIP
+        results.forEach((result, index) => {
+          console.log(`File ${index}: ${result.path}`);
+          if (fs.existsSync(result.path)) {
+            const stats = fs.statSync(result.path);
+            console.log(`  - Exists: YES, Size: ${stats.size} bytes`);
+          } else {
+            console.log(`  - Exists: NO`);
+          }
+        });
+        
         const archiver = require('archiver');
         const zipFileName = `${fileName}_split.zip`;
         zipPath = path.join(outputDir, zipFileName);
@@ -534,91 +485,49 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
           fs.mkdirSync(outputDir, { recursive: true });
         }
         
-        const output = fs.createWriteStream(zipPath);
-        const archive = archiver('zip', { 
-          zlib: { level: 9 },
-          forceLocalTime: true,
-          forceZip64: false,
-          // Windows compatibility settings
-          statConcurrency: 1,
-          highWaterMark: 1024 * 1024, // 1MB buffer
-          // Ensure Windows-compatible file names
-          namePrependSlash: false
+        // Use yazl for Windows compatibility instead of archiver
+        console.log('Using yazl for Windows-compatible ZIP creation...');
+        const yazl = require('yazl');
+        const zipfile = new yazl.ZipFile();
+        
+        // Add files to ZIP using yazl
+        let filesAdded = 0;
+        results.forEach(result => {
+          console.log('Adding file to ZIP:', result.path, 'as', result.fileName);
+          if (fs.existsSync(result.path)) {
+            const stats = fs.statSync(result.path);
+            console.log('File size:', stats.size, 'bytes');
+            
+            // Sanitize file name for Windows compatibility
+            const sanitizedName = sanitizeFileName(result.fileName);
+            console.log('Sanitized file name:', sanitizedName);
+            
+            zipfile.addFile(result.path, sanitizedName);
+            filesAdded++;
+          } else {
+            console.error('File does not exist:', result.path);
+          }
         });
         
+        console.log(`Added ${filesAdded} files to archive`);
+        
+        if (filesAdded === 0) {
+          throw new Error('No files were added to the archive');
+        }
+        
+        // Create the ZIP file using yazl
         await new Promise((resolve, reject) => {
-          let resolved = false;
-          
-          output.on('close', () => {
-            if (!resolved) {
-              resolved = true;
+          zipfile.outputStream.pipe(fs.createWriteStream(zipPath))
+            .on('close', () => {
               console.log('ZIP file created successfully:', zipPath);
-              console.log('Archive size:', archive.pointer(), 'bytes');
               resolve();
-            }
-          });
-          
-          archive.on('error', (err) => {
-            if (!resolved) {
-              resolved = true;
-              console.error('Archive error:', err);
+            })
+            .on('error', (err) => {
+              console.error('ZIP creation error:', err);
               reject(err);
-            }
-          });
+            });
           
-          output.on('error', (err) => {
-            if (!resolved) {
-              resolved = true;
-              console.error('Output stream error:', err);
-              reject(err);
-            }
-          });
-          
-          archive.on('warning', (err) => {
-            if (err.code === 'ENOENT') {
-              console.warn('Archive warning:', err);
-            } else {
-              console.error('Archive warning:', err);
-            }
-          });
-          
-          archive.pipe(output);
-          
-          // Add all PDF files to zip
-          let filesAdded = 0;
-          results.forEach(result => {
-            console.log('Adding file to ZIP:', result.path, 'as', result.fileName);
-            if (fs.existsSync(result.path)) {
-              const stats = fs.statSync(result.path);
-              console.log('File size:', stats.size, 'bytes');
-              
-              // Sanitize file name for Windows compatibility
-              const sanitizedName = sanitizeFileName(result.fileName);
-              console.log('Sanitized file name:', sanitizedName);
-              
-              archive.file(result.path, { 
-                name: sanitizedName,
-                // Windows compatibility options
-                mode: 0o644, // Standard file permissions
-                date: new Date() // Use current date
-              });
-              filesAdded++;
-            } else {
-              console.error('File does not exist:', result.path);
-            }
-          });
-          
-          console.log(`Added ${filesAdded} files to archive`);
-          
-          if (filesAdded === 0) {
-            if (!resolved) {
-              resolved = true;
-              reject(new Error('No files were added to the archive'));
-            }
-            return;
-          }
-          
-          archive.finalize();
+          zipfile.end();
         });
         
         // Verify ZIP file was created and has content
@@ -646,16 +555,63 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
           throw new Error('ZIP file was not created');
         }
         
-        // Clean up temp files after ZIP is created
-        results.forEach(result => {
-          if (fs.existsSync(result.path)) {
-            fs.unlinkSync(result.path);
-          }
-        });
-        
+        // DON'T clean up temp files yet - let's test the ZIP first
+        console.log('ZIP creation completed. Temp files preserved for testing.');
+        console.log('Temp directory contents:');
         if (fs.existsSync(tempDir)) {
-          fs.rmdirSync(tempDir);
+          const tempFiles = fs.readdirSync(tempDir);
+          tempFiles.forEach(file => {
+            const filePath = path.join(tempDir, file);
+            const stats = fs.statSync(filePath);
+            console.log(`  - ${file}: ${stats.size} bytes`);
+          });
         }
+        
+        // Test the ZIP file before cleaning up
+        console.log('Testing ZIP file before cleanup...');
+        if (fs.existsSync(zipPath)) {
+          const zipStats = fs.statSync(zipPath);
+          console.log(`Final ZIP size: ${zipStats.size} bytes`);
+          
+          // Try to read the ZIP file
+          try {
+            const yauzl = require('yauzl');
+            yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
+              if (err) {
+                console.error('ZIP file test failed:', err);
+              } else {
+                console.log('ZIP file test passed - file is readable');
+                let entryCount = 0;
+                zipfile.readEntry();
+                zipfile.on('entry', (entry) => {
+                  entryCount++;
+                  console.log(`  Entry ${entryCount}: ${entry.fileName}`);
+                  zipfile.readEntry();
+                });
+                zipfile.on('end', () => {
+                  console.log(`ZIP contains ${entryCount} entries`);
+                });
+              }
+            });
+          } catch (testError) {
+            console.error('ZIP test error:', testError);
+          }
+        }
+        
+        // Clean up temp files after ZIP is created and tested
+        setTimeout(() => {
+          console.log('Cleaning up temp files...');
+          results.forEach(result => {
+            if (fs.existsSync(result.path)) {
+              fs.unlinkSync(result.path);
+            }
+          });
+          
+          if (fs.existsSync(tempDir)) {
+            fs.rmdirSync(tempDir);
+          }
+          console.log('Temp files cleaned up.');
+        }, 5000); // Wait 5 seconds before cleanup
       } catch (zipError) {
         console.error('Error creating ZIP file:', zipError);
         // Clean up temp files even if ZIP creation fails
@@ -720,20 +676,23 @@ async function testZipIntegrity(zipPath) {
   });
 }
 
-// Create Windows-compatible ZIP using yazl (if available)
+// Create Windows-compatible ZIP using yazl
 async function createWindowsCompatibleZip(results, zipPath) {
   try {
-    console.log('Creating Windows-compatible ZIP...');
+    console.log('Creating Windows-compatible ZIP with yazl...');
     
-    // Try using yazl for maximum Windows compatibility
     const yazl = require('yazl');
     const zipfile = new yazl.ZipFile();
     
-    // Add files to ZIP
+    // Add files to ZIP with extra Windows compatibility
     results.forEach(result => {
       if (fs.existsSync(result.path)) {
         const sanitizedName = sanitizeFileName(result.fileName);
-        zipfile.addFile(result.path, sanitizedName);
+        // Use addFile with explicit options for Windows compatibility
+        zipfile.addFile(result.path, sanitizedName, {
+          mtime: new Date(),
+          mode: 0o644
+        });
         console.log(`Added to Windows ZIP: ${sanitizedName}`);
       }
     });
@@ -781,62 +740,35 @@ function sanitizeFileName(fileName) {
   return sanitized || 'unnamed_file.pdf';
 }
 
-// Alternative ZIP creation method using JSZip (if available)
+// Alternative ZIP creation method using yazl
 async function createZipAlternative(results, zipPath) {
   try {
-    console.log('Trying alternative ZIP creation method...');
+    console.log('Trying alternative ZIP creation method with yazl...');
     
-    // Try using JSZip if available
-    if (typeof window !== 'undefined' && window.JSZip) {
-      const JSZip = window.JSZip;
-      const zip = new JSZip();
-      
-      for (const result of results) {
-        if (fs.existsSync(result.path)) {
-          const fileBuffer = fs.readFileSync(result.path);
-          zip.file(result.fileName, fileBuffer);
-        }
+    const yazl = require('yazl');
+    const zipfile = new yazl.ZipFile();
+    
+    // Add files to ZIP
+    results.forEach(result => {
+      if (fs.existsSync(result.path)) {
+        const sanitizedName = sanitizeFileName(result.fileName);
+        zipfile.addFile(result.path, sanitizedName);
+        console.log(`Added to alternative ZIP: ${sanitizedName}`);
       }
-      
-      const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
-      fs.writeFileSync(zipPath, zipBuffer);
-      console.log('Alternative ZIP creation successful');
-      return;
-    }
-    
-    // Fallback: Use archiver with different settings
-    const archiver = require('archiver');
-    const output = fs.createWriteStream(zipPath);
-    const archive = archiver('zip', { 
-      zlib: { level: 1 }, // Lower compression
-      forceLocalTime: true,
-      forceZip64: false,
-      statConcurrency: 1,
-      namePrependSlash: false
     });
     
+    // Create the ZIP file
     await new Promise((resolve, reject) => {
-      output.on('close', resolve);
-      archive.on('error', reject);
-      output.on('error', reject);
+      zipfile.outputStream.pipe(fs.createWriteStream(zipPath))
+        .on('close', () => {
+          console.log('Alternative ZIP creation successful');
+          resolve();
+        })
+        .on('error', reject);
       
-      archive.pipe(output);
-      
-      results.forEach(result => {
-        if (fs.existsSync(result.path)) {
-          const sanitizedName = sanitizeFileName(result.fileName);
-          archive.file(result.path, { 
-            name: sanitizedName,
-            mode: 0o644,
-            date: new Date()
-          });
-        }
-      });
-      
-      archive.finalize();
+      zipfile.end();
     });
     
-    console.log('Fallback ZIP creation successful');
   } catch (error) {
     console.error('Alternative ZIP creation failed:', error);
     throw error;
