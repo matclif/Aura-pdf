@@ -439,6 +439,7 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
     // Create temp directory if creating zip
     if (createZip && !fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
+      console.log('Created temp directory:', tempDir);
     }
     
     // Handle page range splitting
@@ -461,6 +462,14 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
         
         const pdfBytes = await newPdf.save();
         fs.writeFileSync(outputPath, pdfBytes);
+        
+        // Verify file was created
+        if (fs.existsSync(outputPath)) {
+          const stats = fs.statSync(outputPath);
+          console.log(`Created file: ${outputFileName}, size: ${stats.size} bytes`);
+        } else {
+          console.error(`Failed to create file: ${outputPath}`);
+        }
         
         results.push({
           fileName: outputFileName,
@@ -491,6 +500,14 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
         const pdfBytes = await newPdf.save();
         fs.writeFileSync(outputPath, pdfBytes);
         
+        // Verify file was created
+        if (fs.existsSync(outputPath)) {
+          const stats = fs.statSync(outputPath);
+          console.log(`Created file: ${outputFileName}, size: ${stats.size} bytes`);
+        } else {
+          console.error(`Failed to create file: ${outputPath}`);
+        }
+        
         results.push({
           fileName: outputFileName,
           path: outputPath,
@@ -509,38 +526,99 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
         
         console.log('Creating ZIP file:', zipPath);
         console.log('Number of files to add:', results.length);
+        console.log('Output directory:', outputDir);
+        console.log('Temp directory:', tempDir);
+        
+        // Ensure output directory exists
+        if (!fs.existsSync(outputDir)) {
+          fs.mkdirSync(outputDir, { recursive: true });
+        }
         
         const output = fs.createWriteStream(zipPath);
-        const archive = archiver('zip', { zlib: { level: 9 } });
+        const archive = archiver('zip', { 
+          zlib: { level: 9 },
+          forceLocalTime: true,
+          forceZip64: false
+        });
         
         await new Promise((resolve, reject) => {
+          let resolved = false;
+          
           output.on('close', () => {
-            console.log('ZIP file created successfully:', zipPath);
-            resolve();
+            if (!resolved) {
+              resolved = true;
+              console.log('ZIP file created successfully:', zipPath);
+              console.log('Archive size:', archive.pointer(), 'bytes');
+              resolve();
+            }
           });
+          
           archive.on('error', (err) => {
-            console.error('Archive error:', err);
-            reject(err);
+            if (!resolved) {
+              resolved = true;
+              console.error('Archive error:', err);
+              reject(err);
+            }
           });
+          
           output.on('error', (err) => {
-            console.error('Output stream error:', err);
-            reject(err);
+            if (!resolved) {
+              resolved = true;
+              console.error('Output stream error:', err);
+              reject(err);
+            }
+          });
+          
+          archive.on('warning', (err) => {
+            if (err.code === 'ENOENT') {
+              console.warn('Archive warning:', err);
+            } else {
+              console.error('Archive warning:', err);
+            }
           });
           
           archive.pipe(output);
           
           // Add all PDF files to zip
+          let filesAdded = 0;
           results.forEach(result => {
             console.log('Adding file to ZIP:', result.path, 'as', result.fileName);
             if (fs.existsSync(result.path)) {
+              const stats = fs.statSync(result.path);
+              console.log('File size:', stats.size, 'bytes');
               archive.file(result.path, { name: result.fileName });
+              filesAdded++;
             } else {
               console.error('File does not exist:', result.path);
             }
           });
           
+          console.log(`Added ${filesAdded} files to archive`);
+          
+          if (filesAdded === 0) {
+            if (!resolved) {
+              resolved = true;
+              reject(new Error('No files were added to the archive'));
+            }
+            return;
+          }
+          
           archive.finalize();
         });
+        
+        // Verify ZIP file was created and has content
+        if (fs.existsSync(zipPath)) {
+          const zipStats = fs.statSync(zipPath);
+          console.log('ZIP file created with size:', zipStats.size, 'bytes');
+          
+          if (zipStats.size === 0) {
+            console.error('ZIP file is empty, trying alternative method...');
+            // Try alternative ZIP creation method
+            await createZipAlternative(results, zipPath);
+          }
+        } else {
+          throw new Error('ZIP file was not created');
+        }
         
         // Clean up temp files after ZIP is created
         results.forEach(result => {
@@ -582,7 +660,59 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
   }
 });
 
-
+// Alternative ZIP creation method using JSZip (if available)
+async function createZipAlternative(results, zipPath) {
+  try {
+    console.log('Trying alternative ZIP creation method...');
+    
+    // Try using JSZip if available
+    if (typeof window !== 'undefined' && window.JSZip) {
+      const JSZip = window.JSZip;
+      const zip = new JSZip();
+      
+      for (const result of results) {
+        if (fs.existsSync(result.path)) {
+          const fileBuffer = fs.readFileSync(result.path);
+          zip.file(result.fileName, fileBuffer);
+        }
+      }
+      
+      const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+      fs.writeFileSync(zipPath, zipBuffer);
+      console.log('Alternative ZIP creation successful');
+      return;
+    }
+    
+    // Fallback: Use archiver with different settings
+    const archiver = require('archiver');
+    const output = fs.createWriteStream(zipPath);
+    const archive = archiver('zip', { 
+      zlib: { level: 1 }, // Lower compression
+      forceLocalTime: true
+    });
+    
+    await new Promise((resolve, reject) => {
+      output.on('close', resolve);
+      archive.on('error', reject);
+      output.on('error', reject);
+      
+      archive.pipe(output);
+      
+      results.forEach(result => {
+        if (fs.existsSync(result.path)) {
+          archive.file(result.path, { name: result.fileName });
+        }
+      });
+      
+      archive.finalize();
+    });
+    
+    console.log('Fallback ZIP creation successful');
+  } catch (error) {
+    console.error('Alternative ZIP creation failed:', error);
+    throw error;
+  }
+}
 
 // Get file stats
 ipcMain.handle('get-file-stats', async (event, filePath) => {
