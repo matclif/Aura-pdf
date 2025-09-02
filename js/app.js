@@ -14,20 +14,20 @@ class AuraPDFApp {
         this.textSelections = [];
         
         this.waitForPDFJS().then(() => {
-        this.initializeApp();
-        this.bindEvents();
+            this.initializeApp();
+            this.bindEvents();
             // Load patterns after DOM is ready - only once
             setTimeout(() => {
-        this.loadSavedPatterns();
+                this.loadSavedPatterns();
                 this.debugPatternState(); // Debug pattern state
-            }, 1000); // Increased delay to ensure DOM is fully ready
+            }, 100); // Reduced delay for faster startup
         });
     }
     
     // Wait for PDF.js to be available
     async waitForPDFJS() {
         let attempts = 0;
-        const maxAttempts = 50; // 5 seconds max wait
+        const maxAttempts = 20; // 2 seconds max wait (reduced from 5 seconds)
         
         while (typeof pdfjsLib === 'undefined' && attempts < maxAttempts) {
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -35,7 +35,7 @@ class AuraPDFApp {
         }
         
         if (typeof pdfjsLib === 'undefined') {
-            console.error('PDF.js failed to load after 5 seconds');
+            console.error('PDF.js failed to load after 2 seconds');
             this.setStatus('Warning: PDF.js not loaded - some features may not work');
         } else {
             console.log('PDF.js loaded successfully');
@@ -71,23 +71,6 @@ class AuraPDFApp {
         this.bindElement('split', 'click', () => this.switchTab('split'));
         this.bindElement('files', 'click', () => this.switchTab('files'));
         this.bindElement('settings', 'click', () => this.switchTab('settings'));
-        
-        // Pattern manager
-        this.bindElement('patternManagerBtn', 'click', () => this.openPatternManagerModal());
-        this.bindElement('reloadPatternsBtn', 'click', () => this.forceReloadPatterns());
-        
-        // Rename form
-        this.bindElement('renameBtn', 'click', () => this.renameSelectedFile());
-        this.bindElement('downloadBtn', 'click', () => this.downloadSelectedFile());
-        this.bindElement('newFileName', 'keypress', (e) => {
-            if (e.key === 'Enter') this.renameSelectedFile();
-        });
-        
-        // Visual pattern creation - handled by tab manager now
-        this.bindElement('cancelPatternBtn', 'click', () => this.cancelPatternCreation());
-
-        
-        // Debug button for testing
         
         // Pattern manager
         this.bindElement('patternManagerBtn', 'click', () => this.openPatternManagerModal());
@@ -166,12 +149,21 @@ class AuraPDFApp {
     }
     
     // Helper function to safely bind events to elements
-    bindElement(elementId, eventType, handler) {
+    bindElement(elementId, eventType, handler, retryCount = 0) {
         const element = document.getElementById(elementId);
         if (element) {
             element.addEventListener(eventType, handler);
+        } else if (retryCount < 3) {
+            // Retry after a short delay for elements that might not be loaded yet
+            setTimeout(() => {
+                this.bindElement(elementId, eventType, handler, retryCount + 1);
+            }, 100);
         } else {
-            console.warn(`Element with id '${elementId}' not found, skipping event binding`);
+            // Only log warning for elements that are expected to exist
+            const expectedElements = ['bulk', 'split', 'files', 'settings', 'renameBtn', 'downloadBtn', 'newFileName'];
+            if (expectedElements.includes(elementId)) {
+                console.warn(`Element with id '${elementId}' not found after retries, skipping event binding`);
+            }
         }
     }
     

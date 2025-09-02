@@ -17,9 +17,10 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
       enableRemoteModule: true,
-      webSecurity: false,
+      webSecurity: true, // Enable web security
       backgroundThrottling: false,
-      preload: false // Disable preload for faster startup
+      preload: false, // Disable preload for faster startup
+      allowRunningInsecureContent: false // Disable insecure content
     },
     icon: path.join(__dirname, 'assets', 'icon.png'),
     titleBarStyle: 'default',
@@ -115,7 +116,7 @@ function createWindow() {
         mainWindow.loadURL('data:text/html,<h1>Loading Error</h1><p>Failed to load the application.</p>');
       });
     }
-  }, 300); // Further reduced delay for faster loading
+  }, 150); // Further reduced delay for faster loading
 
   // Show window when ready with additional checks
   mainWindow.once('ready-to-show', () => {

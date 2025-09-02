@@ -212,27 +212,71 @@ class PDFViewer {
             const range = selection.getRangeAt(0);
             const container = range.commonAncestorContainer;
             
-            if (this.textLayer.contains(container) || this.textLayer === container) {
-                // Calculate position information
+            // More strict check to ensure selection is only from PDF text layer
+            const isWithinPDF = this.textLayer.contains(container) || 
+                               this.textLayer === container ||
+                               (container.nodeType === Node.TEXT_NODE && this.textLayer.contains(container.parentNode));
+            
+            if (isWithinPDF) {
+                // Additional validation: check if the selection is actually within our PDF canvas area
                 const rect = range.getBoundingClientRect();
                 const canvasRect = this.canvas.getBoundingClientRect();
                 
-                const position = {
-                    page: this.currentPage,
-                    x: Math.round((rect.left - canvasRect.left) / this.zoomLevel),
-                    y: Math.round((rect.top - canvasRect.top) / this.zoomLevel),
-                    width: Math.round(rect.width / this.zoomLevel),
-                    height: Math.round(rect.height / this.zoomLevel),
-                    zoom: this.zoomLevel
-                };
+                // Check if selection is within canvas bounds
+                const isWithinCanvas = rect.left >= canvasRect.left && 
+                                     rect.right <= canvasRect.right &&
+                                     rect.top >= canvasRect.top && 
+                                     rect.bottom <= canvasRect.bottom;
                 
-                this.onTextSelected(selectedText, position);
-                this.highlightSelection(range);
+                if (isWithinCanvas) {
+                    // Get the exact selected text by walking through the range
+                    const exactText = this.getExactSelectedText(range);
+                    
+                    const position = {
+                        page: this.currentPage,
+                        x: Math.round((rect.left - canvasRect.left) / this.zoomLevel),
+                        y: Math.round((rect.top - canvasRect.top) / this.zoomLevel),
+                        width: Math.round(rect.width / this.zoomLevel),
+                        height: Math.round(rect.height / this.zoomLevel),
+                        zoom: this.zoomLevel
+                    };
+                    
+                    this.onTextSelected(exactText, position);
+                    this.highlightSelection(range);
+                } else {
+                    // Selection is outside PDF canvas, ignore it
+                    console.log('Selection outside PDF canvas, ignoring');
+                    this.clearHighlight();
+                    this.onTextSelected('');
+                }
+            } else {
+                // Selection is not from PDF text layer, ignore it
+                console.log('Selection not from PDF text layer, ignoring');
+                this.clearHighlight();
+                this.onTextSelected('');
             }
         } else {
             this.clearHighlight();
             this.onTextSelected('');
         }
+    }
+    
+    getExactSelectedText(range) {
+        // Create a temporary container to get the exact text content
+        const tempDiv = document.createElement('div');
+        const clonedRange = range.cloneRange();
+        clonedRange.selectNodeContents(tempDiv);
+        
+        // Get the text content of the range
+        const textContent = range.toString();
+        
+        // Clean up the text - remove extra whitespace and normalize
+        const cleanedText = textContent
+            .replace(/\s+/g, ' ')  // Replace multiple whitespace with single space
+            .replace(/\n\s*/g, ' ') // Replace newlines and following spaces with single space
+            .trim();
+        
+        return cleanedText;
     }
     
     highlightSelection(range) {
@@ -434,6 +478,16 @@ class PDFViewer {
 // Add CSS for text selection
 const style = document.createElement('style');
 style.textContent = `
+    /* Prevent text selection outside PDF area */
+    body {
+        user-select: none !important;
+    }
+    
+    /* Allow text selection only in PDF viewer */
+    .pdf-viewer-container {
+        user-select: text !important;
+    }
+    
     .text-layer {
         position: absolute !important;
         left: 0 !important;
