@@ -632,7 +632,18 @@ class BulkTabManager {
                 }
             } catch (error) {
                 errorCount++;
-                errors.push(`${file.name}: ${error.message}`);
+                let userFriendlyMessage = error.message;
+                
+                // Provide more helpful error messages
+                if (error.message.includes('EPERM') || error.message.includes('EACCES')) {
+                    userFriendlyMessage = 'Permission denied. Please run as administrator or choose a different destination folder.';
+                } else if (error.message.includes('Cannot create files in root directory')) {
+                    userFriendlyMessage = 'Cannot create files in root directory. Please choose a subdirectory.';
+                } else if (error.message.includes('cross-device link not permitted')) {
+                    userFriendlyMessage = 'Cannot move files between different drives. Please choose a destination on the same drive.';
+                }
+                
+                errors.push(`${file.name}: ${userFriendlyMessage}`);
                 console.error('Bulk Tab: Error processing file:', file.name, error);
             }
         }

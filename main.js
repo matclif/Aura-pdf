@@ -260,9 +260,25 @@ ipcMain.handle('rename-file', async (event, oldPath, newPath) => {
       // Cross-device operation: copy then delete
       console.log('Cross-device rename detected, using copy + delete method');
       
-      // Ensure destination directory exists
+      // Check if destination path is valid and accessible
       const destDir = path.dirname(newPath);
-      await fs.promises.mkdir(destDir, { recursive: true });
+      const destDrive = path.parse(destDir).root;
+      
+      // Prevent operations on system root directories
+      if (destDir === destDrive || destDir === destDrive.slice(0, -1)) {
+        throw new Error(`Cannot create files in root directory: ${destDir}. Please choose a subdirectory.`);
+      }
+      
+      // Check if we have write permissions to the destination
+      try {
+        // Ensure destination directory exists
+        await fs.promises.mkdir(destDir, { recursive: true });
+      } catch (mkdirError) {
+        if (mkdirError.code === 'EPERM' || mkdirError.code === 'EACCES') {
+          throw new Error(`Permission denied: Cannot create directory ${destDir}. Please run as administrator or choose a different location.`);
+        }
+        throw mkdirError;
+      }
       
       // Copy file to new location
       await fs.promises.copyFile(oldPath, newPath);

@@ -77,10 +77,12 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "PDF Renamer & Splitter",
-
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": true,
-      "menuCategory": "PDF Tools"
+      "menuCategory": "PDF Tools",
+      "allowElevation": true,
+      "perMachine": false,
+      "warningsAsErrors": false
     },
     "mac": {
       "category": "public.app-category.productivity",
