@@ -490,7 +490,7 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
         const yazl = require('yazl');
         const zipfile = new yazl.ZipFile();
         
-        // Add files to ZIP using yazl
+        // Add files to ZIP using yazl - only store filename, not full path
         let filesAdded = 0;
         results.forEach(result => {
           console.log('Adding file to ZIP:', result.path, 'as', result.fileName);
@@ -502,6 +502,8 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
             const sanitizedName = sanitizeFileName(result.fileName);
             console.log('Sanitized file name:', sanitizedName);
             
+            // CRITICAL: Only store the filename in ZIP, not the full path
+            // This ensures Windows compatibility - no absolute paths in ZIP
             zipfile.addFile(result.path, sanitizedName);
             filesAdded++;
           } else {
@@ -573,7 +575,7 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
           const zipStats = fs.statSync(zipPath);
           console.log(`Final ZIP size: ${zipStats.size} bytes`);
           
-          // Try to read the ZIP file
+          // Try to read the ZIP file and verify paths
           try {
             const yauzl = require('yauzl');
             yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
@@ -582,14 +584,27 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
               } else {
                 console.log('ZIP file test passed - file is readable');
                 let entryCount = 0;
+                let hasAbsolutePaths = false;
                 zipfile.readEntry();
                 zipfile.on('entry', (entry) => {
                   entryCount++;
-                  console.log(`  Entry ${entryCount}: ${entry.fileName}`);
+                  console.log(`  Entry ${entryCount}: "${entry.fileName}"`);
+                  
+                  // Check for absolute paths (Windows compatibility issue)
+                  if (entry.fileName.includes('/') || entry.fileName.includes('\\')) {
+                    console.warn(`  WARNING: Entry contains path separators: "${entry.fileName}"`);
+                    hasAbsolutePaths = true;
+                  }
+                  
                   zipfile.readEntry();
                 });
                 zipfile.on('end', () => {
                   console.log(`ZIP contains ${entryCount} entries`);
+                  if (hasAbsolutePaths) {
+                    console.warn('WARNING: ZIP contains absolute paths - may cause Windows compatibility issues');
+                  } else {
+                    console.log('✅ ZIP file paths are Windows-compatible (no absolute paths)');
+                  }
                 });
               }
             });
@@ -684,10 +699,11 @@ async function createWindowsCompatibleZip(results, zipPath) {
     const yazl = require('yazl');
     const zipfile = new yazl.ZipFile();
     
-    // Add files to ZIP with extra Windows compatibility
+    // Add files to ZIP with extra Windows compatibility - only store filename
     results.forEach(result => {
       if (fs.existsSync(result.path)) {
         const sanitizedName = sanitizeFileName(result.fileName);
+        // CRITICAL: Only store the filename in ZIP, not the full path
         // Use addFile with explicit options for Windows compatibility
         zipfile.addFile(result.path, sanitizedName, {
           mtime: new Date(),
@@ -730,14 +746,27 @@ function sanitizeFileName(fileName) {
     sanitized = 'file_' + sanitized;
   }
   
-  // Limit length for Windows compatibility
+  // Windows reserved names
+  const reservedNames = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
+  const nameWithoutExt = path.basename(sanitized, path.extname(sanitized)).toUpperCase();
+  if (reservedNames.includes(nameWithoutExt)) {
+    sanitized = 'file_' + sanitized;
+  }
+  
+  // Limit length for Windows compatibility (255 chars max, but keep it shorter)
   if (sanitized.length > 100) {
     const ext = path.extname(sanitized);
     const name = path.basename(sanitized, ext);
     sanitized = name.substring(0, 100 - ext.length) + ext;
   }
   
-  return sanitized || 'unnamed_file.pdf';
+  // Ensure we have a valid filename
+  if (!sanitized || sanitized.trim() === '') {
+    sanitized = 'unnamed_file.pdf';
+  }
+  
+  console.log(`Sanitized filename: "${fileName}" -> "${sanitized}"`);
+  return sanitized;
 }
 
 // Alternative ZIP creation method using yazl
@@ -748,10 +777,11 @@ async function createZipAlternative(results, zipPath) {
     const yazl = require('yazl');
     const zipfile = new yazl.ZipFile();
     
-    // Add files to ZIP
+    // Add files to ZIP - only store filename, not full path
     results.forEach(result => {
       if (fs.existsSync(result.path)) {
         const sanitizedName = sanitizeFileName(result.fileName);
+        // CRITICAL: Only store the filename in ZIP, not the full path
         zipfile.addFile(result.path, sanitizedName);
         console.log(`Added to alternative ZIP: ${sanitizedName}`);
       }
