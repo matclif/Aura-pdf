@@ -1,0 +1,35 @@
+PDF Renamer & Splitter - Installation Instructions
+==================================================
+
+IMPORTANT: Before installing, please follow these steps:
+
+1. CLOSE THE APP COMPLETELY
+   - If you have "PDF Renamer & Splitter" running, close it completely
+   - Check the system tray (bottom-right corner) and close it from there too
+   - Or run the "close-app.bat" file to force close it
+
+2. RUN THE INSTALLER
+   - Double-click "PDF Renamer & Splitter Setup 1.0.0.exe"
+   - Follow the installation wizard
+   - Choose your installation directory
+   - The installer will create a desktop shortcut automatically
+
+3. IF YOU GET THE "CANNOT BE CLOSED" ERROR:
+   - Click "Cancel" on the error dialog
+   - Close the app manually from Task Manager:
+     * Press Ctrl+Shift+Esc to open Task Manager
+     * Find "PDF Renamer & Splitter" in the Processes tab
+     * Right-click and select "End Task"
+   - Then run the installer again
+
+4. ALTERNATIVE: USE THE PORTABLE VERSION
+   - If installation continues to fail, use "PDF Renamer & Splitter 1.0.0.exe"
+   - This is a portable version that doesn't require installation
+   - Run "install-windows.bat" to create desktop shortcuts manually
+
+TROUBLESHOOTING:
+- If you get permission errors when renaming files, run the app as administrator
+- For cross-drive file operations, choose a destination folder you have write access to
+- The app works best when files are on the same drive
+
+For support, visit: https://github.com/matclif/Aura-pdf

@@ -82,7 +82,10 @@
       "menuCategory": "PDF Tools",
       "allowElevation": true,
       "perMachine": false,
-      "warningsAsErrors": false
+      "warningsAsErrors": false,
+      "uninstallDisplayName": "PDF Renamer & Splitter",
+      "installerIcon": null,
+      "uninstallerIcon": null
     },
     "mac": {
       "category": "public.app-category.productivity",
