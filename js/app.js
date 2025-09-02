@@ -1558,6 +1558,9 @@ class AuraPDFApp {
             console.log('Saving patterns to localStorage:', this.patterns);
             localStorage.setItem('aura-pdf-patterns', JSON.stringify(this.patterns));
             this.loadSavedPatterns();
+            
+            // Update bulk operations patterns if modal is open
+            this.updateBulkOperationsPatterns();
         } catch (error) {
             console.error('Error saving patterns:', error);
         }
@@ -1850,6 +1853,25 @@ class AuraPDFApp {
             this.savePatterns();
             this.loadSavedPatterns();
             this.setStatus(`Pattern "${pattern.name}" deleted`);
+            
+            // Update bulk operations modal if it's open
+            this.updateBulkOperationsPatterns();
+        }
+    }
+    
+    updateBulkOperationsPatterns() {
+        // Check if bulk operations modal is open and update its patterns
+        const bulkModal = document.getElementById('bulkRenameModal');
+        if (bulkModal && bulkModal.classList.contains('active')) {
+            console.log('Updating bulk operations patterns after deletion...');
+            if (window.bulkOperations) {
+                // Update the patterns in bulk operations
+                window.bulkOperations.patterns = this.patterns;
+                // Refresh the pattern dropdowns
+                window.bulkOperations.populatePatternDropdown();
+                // Update the preview to reflect changes
+                window.bulkOperations.updatePreview();
+            }
         }
     }
     
@@ -2780,7 +2802,7 @@ class AuraPDFApp {
     }
     
     async splitByPageCount(selectedFile, pagesPerFile) {
-        return await ipcRenderer.invoke('split-pdf', selectedFile.path, null, pageCount, true);
+        return await ipcRenderer.invoke('split-pdf', selectedFile.path, null, pagesPerFile, true);
     }
     
 

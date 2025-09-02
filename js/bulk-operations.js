@@ -128,6 +128,13 @@ class BulkOperations {
         const secondPatternSelect = document.getElementById('secondPattern');
         const thirdPatternSelect = document.getElementById('thirdPattern');
         
+        // Store current selections
+        const currentSelections = [
+            select.value,
+            secondPatternSelect.value,
+            thirdPatternSelect.value
+        ];
+        
         // Clear and populate all dropdowns
         [select, secondPatternSelect, thirdPatternSelect].forEach((dropdown, index) => {
             dropdown.innerHTML = index === 0 ? '<option value="">Choose a pattern...</option>' : '<option value="-1">No pattern</option>';
@@ -138,6 +145,21 @@ class BulkOperations {
                 option.textContent = `${pattern.name} (${pattern.type === 'visual_position' ? 'Visual' : 'Text'})`;
                 dropdown.appendChild(option);
             });
+        });
+        
+        // Restore selections if they still exist, otherwise reset to default
+        [select, secondPatternSelect, thirdPatternSelect].forEach((dropdown, index) => {
+            const currentSelection = currentSelections[index];
+            if (currentSelection && currentSelection !== '' && currentSelection !== '-1') {
+                // Check if the selected pattern index still exists
+                const patternIndex = parseInt(currentSelection);
+                if (patternIndex >= 0 && patternIndex < this.patterns.length) {
+                    dropdown.value = currentSelection;
+                } else {
+                    // Pattern no longer exists, reset to default
+                    dropdown.value = index === 0 ? '' : '-1';
+                }
+            }
         });
     }
     

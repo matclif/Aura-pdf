@@ -502,36 +502,69 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
     // Create ZIP if requested
     let zipPath = null;
     if (createZip) {
-      const archiver = require('archiver');
-      const zipFileName = `${fileName}_split.zip`;
-      zipPath = path.join(outputDir, zipFileName);
-      
-      const output = fs.createWriteStream(zipPath);
-      const archive = archiver('zip', { zlib: { level: 9 } });
-      
-      await new Promise((resolve, reject) => {
-        output.on('close', resolve);
-        archive.on('error', reject);
+      try {
+        const archiver = require('archiver');
+        const zipFileName = `${fileName}_split.zip`;
+        zipPath = path.join(outputDir, zipFileName);
         
-        archive.pipe(output);
+        console.log('Creating ZIP file:', zipPath);
+        console.log('Number of files to add:', results.length);
         
-        // Add all PDF files to zip
-        results.forEach(result => {
-          archive.file(result.path, { name: result.fileName });
+        const output = fs.createWriteStream(zipPath);
+        const archive = archiver('zip', { zlib: { level: 9 } });
+        
+        await new Promise((resolve, reject) => {
+          output.on('close', () => {
+            console.log('ZIP file created successfully:', zipPath);
+            resolve();
+          });
+          archive.on('error', (err) => {
+            console.error('Archive error:', err);
+            reject(err);
+          });
+          output.on('error', (err) => {
+            console.error('Output stream error:', err);
+            reject(err);
+          });
+          
+          archive.pipe(output);
+          
+          // Add all PDF files to zip
+          results.forEach(result => {
+            console.log('Adding file to ZIP:', result.path, 'as', result.fileName);
+            if (fs.existsSync(result.path)) {
+              archive.file(result.path, { name: result.fileName });
+            } else {
+              console.error('File does not exist:', result.path);
+            }
+          });
+          
+          archive.finalize();
         });
         
-        archive.finalize();
-      });
-      
-      // Clean up temp files
-      results.forEach(result => {
-        if (fs.existsSync(result.path)) {
-          fs.unlinkSync(result.path);
+        // Clean up temp files after ZIP is created
+        results.forEach(result => {
+          if (fs.existsSync(result.path)) {
+            fs.unlinkSync(result.path);
+          }
+        });
+        
+        if (fs.existsSync(tempDir)) {
+          fs.rmdirSync(tempDir);
         }
-      });
-      
-      if (fs.existsSync(tempDir)) {
-        fs.rmdirSync(tempDir);
+      } catch (zipError) {
+        console.error('Error creating ZIP file:', zipError);
+        // Clean up temp files even if ZIP creation fails
+        results.forEach(result => {
+          if (fs.existsSync(result.path)) {
+            fs.unlinkSync(result.path);
+          }
+        });
+        
+        if (fs.existsSync(tempDir)) {
+          fs.rmdirSync(tempDir);
+        }
+        throw zipError;
       }
     }
     
