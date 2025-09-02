@@ -1,10 +1,10 @@
 @echo off
-echo Installing PDF Renamer & Splitter...
+echo Installing Aura PDF...
 
 REM Get the current directory (where the batch file is located)
 set "APP_DIR=%~dp0"
-set "APP_NAME=PDF Renamer & Splitter"
-set "EXE_NAME=PDF Renamer & Splitter.exe"
+set "APP_NAME=Aura PDF"
+set "EXE_NAME=Aura PDF.exe"
 
 REM Check if the executable exists
 if not exist "%APP_DIR%%EXE_NAME%" (
@@ -26,7 +26,7 @@ if "%DESKTOP%"=="" (
 )
 
 REM Create shortcut using PowerShell
-powershell -Command "$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%DESKTOP%\%APP_NAME%.lnk'); $Shortcut.TargetPath = '%APP_DIR%%EXE_NAME%'; $Shortcut.WorkingDirectory = '%APP_DIR%'; $Shortcut.Description = 'PDF Renamer & Splitter - Offline PDF tool'; $Shortcut.Save()"
+powershell -Command "$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%DESKTOP%\%APP_NAME%.lnk'); $Shortcut.TargetPath = '%APP_DIR%%EXE_NAME%'; $Shortcut.WorkingDirectory = '%APP_DIR%'; $Shortcut.Description = 'Aura PDF - Smart PDF Management Tool'; $Shortcut.Save()"
 
 if %errorlevel% equ 0 (
     echo Desktop shortcut created successfully!
@@ -49,7 +49,7 @@ REM Create Programs folder for our app
 if not exist "%PROGRAMS%\PDF Tools" mkdir "%PROGRAMS%\PDF Tools"
 
 REM Create Start Menu shortcut
-powershell -Command "$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%PROGRAMS%\PDF Tools\%APP_NAME%.lnk'); $Shortcut.TargetPath = '%APP_DIR%%EXE_NAME%'; $Shortcut.WorkingDirectory = '%APP_DIR%'; $Shortcut.Description = 'PDF Renamer & Splitter - Offline PDF tool'; $Shortcut.Save()"
+powershell -Command "$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%PROGRAMS%\PDF Tools\%APP_NAME%.lnk'); $Shortcut.TargetPath = '%APP_DIR%%EXE_NAME%'; $Shortcut.WorkingDirectory = '%APP_DIR%'; $Shortcut.Description = 'Aura PDF - Smart PDF Management Tool'; $Shortcut.Save()"
 
 if %errorlevel% equ 0 (
     echo Start Menu shortcut created successfully!

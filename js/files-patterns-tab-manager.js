@@ -286,8 +286,15 @@ class FilesPatternsTabManager {
             return;
         }
 
+        // Force focus and get the value to ensure it's captured
+        patternName.focus();
         const name = patternName.value.trim();
         console.log('Files & Patterns: Pattern name value:', name);
+        console.log('Files & Patterns: Pattern name length:', name.length);
+        console.log('Files & Patterns: Pattern name raw value:', JSON.stringify(patternName.value));
+        console.log('Files & Patterns: Pattern name disabled:', patternName.disabled);
+        console.log('Files & Patterns: Pattern name readonly:', patternName.readOnly);
+        
         if (!name) {
             console.error('Files & Patterns: Pattern name is empty');
             this.setStatus('Please enter a pattern name before saving');
@@ -334,9 +341,9 @@ class FilesPatternsTabManager {
 
         // Save to localStorage
         try {
-            const existingPatterns = JSON.parse(localStorage.getItem('pdf-renamer-patterns') || '[]');
+            const existingPatterns = JSON.parse(localStorage.getItem('aura-pdf-patterns') || '[]');
             existingPatterns.push(pattern);
-            localStorage.setItem('pdf-renamer-patterns', JSON.stringify(existingPatterns));
+            localStorage.setItem('aura-pdf-patterns', JSON.stringify(existingPatterns));
             
             // Update the patterns array in the main app
             if (window.app && window.app.patterns) {

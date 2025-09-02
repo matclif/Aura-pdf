@@ -1,6 +1,6 @@
 @echo off
-echo Closing PDF Renamer & Splitter...
-taskkill /f /im "PDF Renamer & Splitter.exe" 2>nul
+echo Closing Aura PDF...
+taskkill /f /im "Aura PDF.exe" 2>nul
 if %errorlevel% equ 0 (
     echo App closed successfully!
 ) else (

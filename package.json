@@ -1,7 +1,7 @@
 {
-  "name": "pdf-renamer-splitter",
+  "name": "aura-pdf",
   "version": "1.0.0",
-  "description": "Offline PDF Renamer & Splitter with Smart Text Selection",
+  "description": "Aura PDF - Smart PDF Management Tool",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -35,8 +35,8 @@
     "pdfjs-dist": "^3.11.174"
   },
   "build": {
-    "appId": "com.pdftools.renamer",
-    "productName": "PDF Renamer & Splitter",
+    "appId": "com.aura.pdf",
+    "productName": "Aura PDF",
     "directories": {
       "output": "dist"
     },
@@ -67,7 +67,6 @@
           "arch": ["x64"]
         }
       ],
-
       "requestedExecutionLevel": "asInvoker",
       "verifyUpdateCodeSignature": false
     },
@@ -76,14 +75,14 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "PDF Renamer & Splitter",
+      "shortcutName": "Aura PDF",
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": true,
       "menuCategory": "PDF Tools",
       "allowElevation": true,
       "perMachine": false,
       "warningsAsErrors": false,
-      "uninstallDisplayName": "PDF Renamer & Splitter",
+      "uninstallDisplayName": "Aura PDF",
       "installerIcon": null,
       "uninstallerIcon": null
     },

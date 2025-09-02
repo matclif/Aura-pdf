@@ -1,7 +1,7 @@
 // Main Application Logic
 const { ipcRenderer } = require('electron');
 
-class PDFRenamerApp {
+class AuraPDFApp {
     constructor() {
         this.files = [];
         this.selectedFile = null;
@@ -50,8 +50,8 @@ class PDFRenamerApp {
         console.log('=== Pattern Debug Info ===');
         console.log('Current patterns array:', this.patterns);
         console.log('Patterns array length:', this.patterns.length);
-        console.log('localStorage content:', localStorage.getItem('pdf-renamer-patterns'));
-        console.log('localStorage parsed:', JSON.parse(localStorage.getItem('pdf-renamer-patterns') || '[]'));
+        console.log('localStorage content:', localStorage.getItem('aura-pdf-patterns'));
+        console.log('localStorage parsed:', JSON.parse(localStorage.getItem('aura-pdf-patterns') || '[]'));
         console.log('========================');
     }
     
@@ -85,8 +85,7 @@ class PDFRenamerApp {
         
         // Visual pattern creation - handled by tab manager now
         this.bindElement('cancelPatternBtn', 'click', () => this.cancelPatternCreation());
-        this.bindElement('newPatternName', 'input', () => this.updatePatternPreview());
-        this.bindElement('patternDescription', 'input', () => this.updatePatternPreview());
+
         
         // Debug button for testing
         
@@ -103,8 +102,7 @@ class PDFRenamerApp {
         
         // Visual pattern creation - handled by tab manager now
         this.bindElement('cancelPatternBtn', 'click', () => this.cancelPatternCreation());
-        this.bindElement('newPatternName', 'input', () => this.updatePatternPreview());
-        this.bindElement('patternDescription', 'input', () => this.updatePatternPreview());
+
         
         // Debug button for testing - removed save button manipulation
         
@@ -713,7 +711,7 @@ class PDFRenamerApp {
                 'settings': 'Settings'
             };
             
-            const tabNameDisplay = tabNames[tabName] || 'PDF Renamer & Splitter';
+            const tabNameDisplay = tabNames[tabName] || 'Aura PDF';
             headerTitle.innerHTML = `<i class="fas fa-file-pdf"></i> Aura PDF App - ${tabNameDisplay}`;
         }
         
@@ -1014,7 +1012,7 @@ class PDFRenamerApp {
     // Ensure sample patterns exist
     ensureSamplePatterns() {
         try {
-            const saved = localStorage.getItem('pdf-renamer-patterns');
+            const saved = localStorage.getItem('aura-pdf-patterns');
             if (!saved || JSON.parse(saved).length === 0) {
                 console.log('Creating sample patterns...');
                 this.patterns = [
@@ -1551,7 +1549,7 @@ class PDFRenamerApp {
     // Pattern Management
     loadPatterns() {
         try {
-            const saved = localStorage.getItem('pdf-renamer-patterns');
+            const saved = localStorage.getItem('aura-pdf-patterns');
             console.log('Loading patterns from localStorage:', saved);
             const patterns = saved ? JSON.parse(saved) : [];
             console.log('Parsed patterns:', patterns);
@@ -1565,7 +1563,7 @@ class PDFRenamerApp {
     savePatterns() {
         try {
             console.log('Saving patterns to localStorage:', this.patterns);
-            localStorage.setItem('pdf-renamer-patterns', JSON.stringify(this.patterns));
+            localStorage.setItem('aura-pdf-patterns', JSON.stringify(this.patterns));
             this.loadSavedPatterns();
         } catch (error) {
             console.error('Error saving patterns:', error);
@@ -3156,7 +3154,7 @@ class PDFRenamerApp {
     
     forceReloadPatterns() {
         console.log('=== FORCE RELOAD PATTERNS ===');
-        const savedPatterns = localStorage.getItem('pdf-renamer-patterns');
+        const savedPatterns = localStorage.getItem('aura-pdf-patterns');
         console.log('Raw localStorage content:', savedPatterns);
         
         if (savedPatterns) {
@@ -3178,7 +3176,7 @@ class PDFRenamerApp {
     
     ensureSamplePatterns() {
         // Check localStorage directly and create patterns if none exist
-        const savedPatterns = localStorage.getItem('pdf-renamer-patterns');
+        const savedPatterns = localStorage.getItem('aura-pdf-patterns');
         console.log('ensureSamplePatterns - localStorage content:', savedPatterns);
         
         if (!savedPatterns || savedPatterns === '[]' || savedPatterns === 'null') {
@@ -3207,7 +3205,7 @@ class PDFRenamerApp {
             ];
             
             this.patterns = samplePatterns;
-            localStorage.setItem('pdf-renamer-patterns', JSON.stringify(samplePatterns));
+            localStorage.setItem('aura-pdf-patterns', JSON.stringify(samplePatterns));
             console.log('Sample patterns created and saved:', this.patterns);
             this.updatePatternList();
         } else {
@@ -3227,6 +3225,6 @@ class PDFRenamerApp {
 // Initialize app when DOM is loaded
 let app;
 document.addEventListener('DOMContentLoaded', () => {
-    app = new PDFRenamerApp();
+    app = new AuraPDFApp();
     window.app = app; // Make available globally
 });

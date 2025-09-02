@@ -657,10 +657,10 @@
             // Wait a bit for all scripts to be ready
             setTimeout(() => {
                 console.log('Initializing main app...');
-                if (typeof PDFRenamerApp !== 'undefined') {
-                    window.app = new PDFRenamerApp();
+                if (typeof AuraPDFApp !== 'undefined') {
+                    window.app = new AuraPDFApp();
                 } else {
-                    console.error('PDFRenamerApp not found');
+                    console.error('AuraPDFApp not found');
                 }
             }, 100);
         });

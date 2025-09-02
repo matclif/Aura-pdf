@@ -247,7 +247,7 @@ class PatternManager {
     
     savePatterns() {
         try {
-            localStorage.setItem('pdf-renamer-patterns', JSON.stringify(this.patterns));
+            localStorage.setItem('aura-pdf-patterns', JSON.stringify(this.patterns));
         } catch (error) {
             console.error('Error saving patterns:', error);
             alert('Error saving patterns: ' + error.message);
@@ -291,7 +291,7 @@ class PatternManager {
         const dataStr = JSON.stringify(this.patterns, null, 2);
         const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
         
-        const exportFileDefaultName = 'pdf-renamer-patterns.json';
+        const exportFileDefaultName = 'aura-pdf-patterns.json';
         
         const linkElement = document.createElement('a');
         linkElement.setAttribute('href', dataUri);

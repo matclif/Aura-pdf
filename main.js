@@ -18,13 +18,22 @@ function createWindow() {
       contextIsolation: false,
       enableRemoteModule: true,
       webSecurity: false,
-      backgroundThrottling: false
+      backgroundThrottling: false,
+      preload: false // Disable preload for faster startup
     },
     icon: path.join(__dirname, 'assets', 'icon.png'),
     titleBarStyle: 'default',
     show: false,
-    backgroundColor: '#ffffff',
-    title: 'PDF Renamer & Splitter'
+    backgroundColor: '#2c3e50',
+    title: 'Aura PDF App',
+    frame: true,
+    transparent: false,
+    hasShadow: true,
+    center: true,
+    resizable: true,
+    maximizable: true,
+    minimizable: true,
+    closable: true
   });
 
   // Prevent multiple instances
@@ -32,16 +41,85 @@ function createWindow() {
     return;
   }
 
-  // Load the app with error handling
-  mainWindow.loadFile('index.html').catch((error) => {
-    console.error('Failed to load index.html:', error);
-    mainWindow.loadURL('data:text/html,<h1>Loading Error</h1><p>Failed to load the application.</p>');
-  });
+  // Show window immediately with loading screen
+  mainWindow.show();
+  
+  // Load a loading screen first
+  const loadingHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Aura PDF App - Loading</title>
+      <style>
+        body {
+          margin: 0;
+          padding: 0;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          color: white;
+        }
+        .loading-container {
+          text-align: center;
+          animation: fadeIn 1s ease-in;
+        }
+        .logo {
+          font-size: 3rem;
+          font-weight: bold;
+          margin-bottom: 1rem;
+          text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .spinner {
+          border: 4px solid rgba(255,255,255,0.3);
+          border-radius: 50%;
+          border-top: 4px solid white;
+          width: 50px;
+          height: 50px;
+          animation: spin 1s linear infinite;
+          margin: 0 auto 1rem;
+        }
+        .loading-text {
+          font-size: 1.2rem;
+          opacity: 0.9;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="loading-container">
+        <div class="logo">Aura PDF</div>
+        <div class="spinner"></div>
+        <div class="loading-text">Loading your PDF tools...</div>
+      </div>
+    </body>
+    </html>
+  `;
+  
+  mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(loadingHTML)}`);
+
+  // Load the actual app after a short delay
+  setTimeout(() => {
+    if (!mainWindow.isDestroyed()) {
+      mainWindow.loadFile('index.html').catch((error) => {
+        console.error('Failed to load index.html:', error);
+        mainWindow.loadURL('data:text/html,<h1>Loading Error</h1><p>Failed to load the application.</p>');
+      });
+    }
+  }, 300); // Further reduced delay for faster loading
 
   // Show window when ready with additional checks
   mainWindow.once('ready-to-show', () => {
     if (!mainWindow.isDestroyed()) {
-      mainWindow.show();
       mainWindow.focus();
     }
   });
@@ -78,8 +156,9 @@ if (!gotTheLock) {
 
   // App event handlers
   app.whenReady().then(() => {
-    // Add a small delay to ensure everything is ready
-    setTimeout(createWindow, 100);
+    // Create window immediately for faster startup
+    createWindow();
+    createMenu();
   });
 
   app.on('window-all-closed', () => {
@@ -171,12 +250,12 @@ const createMenu = () => {
       label: 'Help',
       submenu: [
         {
-          label: 'About PDF Renamer & Splitter',
+          label: 'About Aura PDF',
           click: () => {
             dialog.showMessageBox(mainWindow, {
               type: 'info',
               title: 'About',
-              message: 'PDF Renamer & Splitter',
+              message: 'Aura PDF',
               detail: 'Version 1.0.0\\n\\nOffline PDF processing tool with smart renaming and splitting capabilities.'
             });
           }
@@ -207,9 +286,7 @@ const createMenu = () => {
   Menu.setApplicationMenu(menu);
 };
 
-app.whenReady().then(() => {
-  createMenu();
-});
+
 
 // IPC handlers for PDF operations
 
