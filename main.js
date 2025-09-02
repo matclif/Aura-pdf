@@ -20,7 +20,13 @@ function createWindow() {
       webSecurity: true, // Enable web security
       backgroundThrottling: false,
       preload: false, // Disable preload for faster startup
-      allowRunningInsecureContent: false // Disable insecure content
+      allowRunningInsecureContent: false, // Disable insecure content
+      // Windows-specific settings
+      experimentalFeatures: false,
+      enableBlinkFeatures: '',
+      disableBlinkFeatures: '',
+      // Ensure proper file access on Windows
+      additionalArguments: []
     },
     icon: path.join(__dirname, 'assets', 'icon.png'),
     titleBarStyle: 'default',
@@ -45,11 +51,37 @@ function createWindow() {
   // Show window immediately
   mainWindow.show();
   
-  // Load the main HTML file directly
-  mainWindow.loadFile('index.html').catch((error) => {
+  // Load the main HTML file with absolute path for Windows compatibility
+  const htmlPath = path.join(__dirname, 'index.html');
+  console.log('Loading HTML from:', htmlPath);
+  
+  // Check if HTML file exists
+  if (!fs.existsSync(htmlPath)) {
+    console.error('HTML file does not exist at:', htmlPath);
+    mainWindow.loadURL('data:text/html,<h1>Loading Error</h1><p>HTML file not found at: ' + htmlPath + '</p>');
+    return;
+  }
+  
+  mainWindow.loadFile(htmlPath).catch((error) => {
     console.error('Failed to load index.html:', error);
-    // Fallback to simple error page
-    mainWindow.loadURL('data:text/html,<h1>Loading Error</h1><p>Failed to load the application.</p>');
+    console.error('HTML path:', htmlPath);
+    console.error('Current directory:', __dirname);
+    
+    // Try alternative loading methods
+    try {
+      // Try loading with file:// protocol
+      const fileUrl = `file://${htmlPath}`;
+      console.log('Trying file:// URL:', fileUrl);
+      mainWindow.loadURL(fileUrl).catch((urlError) => {
+        console.error('File URL loading failed:', urlError);
+        // Final fallback to simple error page
+        mainWindow.loadURL('data:text/html,<h1>Loading Error</h1><p>Failed to load the application.</p><p>Error: ' + error.message + '</p>');
+      });
+    } catch (fallbackError) {
+      console.error('Fallback loading failed:', fallbackError);
+      // Final fallback to simple error page
+      mainWindow.loadURL('data:text/html,<h1>Loading Error</h1><p>Failed to load the application.</p><p>Error: ' + error.message + '</p>');
+    }
   });
 
   // Show window when ready with additional checks
@@ -91,9 +123,18 @@ if (!gotTheLock) {
 
   // App event handlers
   app.whenReady().then(() => {
-    // Create window immediately for faster startup
-    createWindow();
-    createMenu();
+    console.log('Electron app is ready');
+    console.log('Platform:', process.platform);
+    console.log('App path:', app.getAppPath());
+    console.log('User data path:', app.getPath('userData'));
+    
+    try {
+      // Create window immediately for faster startup
+      createWindow();
+      createMenu();
+    } catch (error) {
+      console.error('Error during app initialization:', error);
+    }
   });
 
   app.on('window-all-closed', () => {
