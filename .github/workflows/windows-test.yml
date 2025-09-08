@@ -11,10 +11,10 @@ jobs:
     runs-on: windows-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Setup Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: '18'
         cache: 'npm'
@@ -25,13 +25,32 @@ jobs:
     - name: Build Windows app
       run: npm run build:win
     
+    - name: Verify build artifacts
+      run: |
+        echo "Checking if build artifacts exist..."
+        if (Test-Path "dist\Aura PDF™ Setup 2.0.0.exe") {
+          echo "✅ Windows installer created successfully"
+          Get-Item "dist\Aura PDF™ Setup 2.0.0.exe" | Select-Object Name, Length
+        } else {
+          echo "❌ Windows installer not found"
+          exit 1
+        }
+        if (Test-Path "dist\Aura PDF™ 2.0.0.exe") {
+          echo "✅ Portable executable created successfully"
+          Get-Item "dist\Aura PDF™ 2.0.0.exe" | Select-Object Name, Length
+        } else {
+          echo "❌ Portable executable not found"
+          exit 1
+        }
+    
     - name: Test app startup
       run: |
-        # Test if the app can start
-        timeout 10 npm start || echo "App started successfully"
+        # Test if the app can start (with timeout)
+        echo "Testing app startup..."
+        timeout 15 npm start || echo "App startup test completed"
     
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: windows-build
         path: dist/
