@@ -68,9 +68,11 @@ class SplitTabManager {
             downloadIndividualBtn.addEventListener('click', () => this.downloadIndividual());
         }
 
-        const downloadZipBtn = document.getElementById('downloadZipBtn');
-        if (downloadZipBtn) {
-            downloadZipBtn.addEventListener('click', () => this.downloadZip());
+        // ZIP button removed
+
+        const downloadAllBtn = document.getElementById('downloadAllBtn');
+        if (downloadAllBtn) {
+            downloadAllBtn.addEventListener('click', () => this.downloadAllToDownloads());
         }
     }
 
@@ -242,7 +244,7 @@ class SplitTabManager {
             }
 
             this.updateUI();
-            this.setStatus(`Successfully split PDF into ${this.splitResults.length} pages`);
+            this.setStatus(`Successfully split PDF into ${this.splitResults.length} pages. Click "Download Individual Files" to save them.`);
         } catch (error) {
             console.error('Error splitting PDF:', error);
             this.setStatus('Error splitting PDF: ' + error.message);
@@ -313,7 +315,7 @@ class SplitTabManager {
             }
 
             this.updateUI();
-            this.setStatus(`Successfully split PDF from page ${startPage} to ${endPage}`);
+            this.setStatus(`Successfully split PDF from page ${startPage} to ${endPage} (${this.splitResults.length} pages). Click "Download Individual Files" to save them.`);
         } catch (error) {
             console.error('Error splitting PDF:', error);
             this.setStatus('Error splitting PDF: ' + error.message);
@@ -365,68 +367,47 @@ class SplitTabManager {
         this.setStatus('Individual files downloaded');
     }
 
-    async downloadZip() {
+    // ZIP download method removed
+
+    async downloadAllToDownloads() {
         if (this.splitResults.length === 0) {
             this.setStatus('No split results to download');
             return;
         }
 
+        this.setStatus('Downloading all files to Downloads folder...');
+
         try {
-            if (!window.JSZip) {
-                this.setStatus('ZIP library not available');
+            if (!window.electronAPI) {
+                this.setStatus('Desktop app required for auto-download');
                 return;
             }
 
-            this.setStatus('Creating ZIP file...');
+            // Force use of the backend method
+            console.log('=== AURA PDF v1.0.2 - Download All Files ===');
+            console.log('FORCING use of backend downloadAllSplitFiles method...');
+            console.log('Available methods:', Object.keys(window.electronAPI));
+            console.log('Split results count:', this.splitResults.length);
+            console.log('File name:', this.uploadedFile.name);
             
-            const zip = new window.JSZip();
+            const result = await window.electronAPI.downloadAllSplitFilesV2(this.splitResults, this.uploadedFile.name);
             
-            this.splitResults.forEach(result => {
-                zip.file(result.name, result.data);
-            });
+            if (result.success) {
+                this.setStatus('All files downloaded to Downloads folder');
+                alert(`All files downloaded successfully!\n\n` +
+                      `Files saved to: ${result.folderPath}\n` +
+                      `Total files: ${result.totalFiles}`);
 
-            const zipBlob = await zip.generateAsync({ type: 'blob' });
-            const zipName = `${this.uploadedFile.name.replace('.pdf', '')}_split.zip`;
-
-            if (window.electronAPI) {
-                // Desktop app
-                const saveResult = await window.electronAPI.showSaveDialog({
-                    defaultPath: zipName,
-                    filters: [{ name: 'ZIP Files', extensions: ['zip'] }]
-                });
-                
-                if (!saveResult.canceled && saveResult.filePath) {
-                    try {
-                        const zipBuffer = await zipBlob.arrayBuffer();
-                        const writeResult = await window.electronAPI.writeFile(saveResult.filePath, zipBuffer);
-                        
-                        if (writeResult.success) {
-                            console.log('ZIP file saved successfully:', saveResult.filePath);
-                            this.setStatus('ZIP file saved successfully');
-                        } else {
-                            console.error('ZIP file write failed:', writeResult.error);
-                            this.setStatus('Failed to save ZIP file');
-                        }
-                    } catch (writeError) {
-                        console.error('Error writing ZIP file:', writeError);
-                        this.setStatus('Error writing ZIP file');
-                    }
-                }
+                // Open the folder
+                await window.electronAPI.openFolder(result.folderPath);
             } else {
-                // Web app
-                const url = URL.createObjectURL(zipBlob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = zipName;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                this.setStatus('ZIP file downloaded');
+                throw new Error(result.error);
             }
+
         } catch (error) {
-            console.error('Error creating ZIP:', error);
-            this.setStatus('Error creating ZIP file: ' + error.message);
+            console.error('Error downloading all files:', error);
+            this.setStatus('Error downloading files: ' + error.message);
+            alert(`Error downloading files: ${error.message}\n\nPlease try again or use "Download as ZIP" instead.`);
         }
     }
 
@@ -439,13 +420,13 @@ class SplitTabManager {
         const splitAllBtn = document.getElementById('splitAllBtn');
         const splitRangeBtn = document.getElementById('splitRangeBtn');
         const downloadIndividualBtn = document.getElementById('downloadIndividualBtn');
-        const downloadZipBtn = document.getElementById('downloadZipBtn');
+        const downloadAllBtn = document.getElementById('downloadAllBtn');
 
         if (clearFilesBtn) clearFilesBtn.disabled = !hasFile;
         if (splitAllBtn) splitAllBtn.disabled = !hasFile;
         if (splitRangeBtn) splitRangeBtn.disabled = !hasFile;
         if (downloadIndividualBtn) downloadIndividualBtn.disabled = !hasResults;
-        if (downloadZipBtn) downloadZipBtn.disabled = !hasResults;
+        if (downloadAllBtn) downloadAllBtn.disabled = !hasResults;
 
         // Update file info
         this.updateFileList();

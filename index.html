@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: blob:; worker-src 'self' blob:;">
-    <title>Aura PDF App</title>
+    <title>Aura PDF™ - Smart PDF Management Tool by Matovu Wycliff</title>
+    <link rel="icon" type="image/png" href="assets/icons/aura-icon-32.png">
+    <link rel="apple-touch-icon" href="assets/icons/aura-icon-128.png">
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -13,7 +15,7 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-content">
-                <h1><i class="fas fa-file-pdf"></i> Aura PDF App</h1>
+                <h1><i class="fas fa-file-pdf"></i> Aura PDF™</h1>
 
             </div>
         </header>
@@ -141,7 +143,7 @@
                         <div class="split-content">
                             <div class="split-header">
                                 <h3><i class="fas fa-cut"></i> PDF Splitting</h3>
-                                <p>Split large PDFs into smaller files and download as ZIP</p>
+                                <p>Split large PDFs into smaller files</p>
                             </div>
                             
                             <!-- File Loading Section -->
@@ -196,12 +198,20 @@
                                     <!-- Download Actions -->
                                     <div class="download-actions" style="margin-top: 15px;">
                                         <h5><i class="fas fa-download"></i> Download Options</h5>
-                                        <button class="btn btn-success" id="downloadIndividualBtn" disabled>
-                                            <i class="fas fa-file-pdf"></i> Download Individual Files
-                                        </button>
-                                        <button class="btn btn-warning" id="downloadZipBtn" disabled>
-                                            <i class="fas fa-file-archive"></i> Download as ZIP
-                                        </button>
+                                        <div class="download-buttons">
+                                            <button class="btn btn-info btn-primary-download" id="downloadAllBtn" disabled>
+                                                <i class="fas fa-folder-download"></i> Download All to Folder
+                                            </button>
+                                            <button class="btn btn-success btn-secondary-download" id="downloadIndividualBtn" disabled>
+                                                <i class="fas fa-file-pdf"></i> Download Individual Files
+                                            </button>
+                                        </div>
+                                        <div class="download-info">
+                                            <small class="text-muted">
+                                                <strong>All to Folder:</strong> Auto-save to Downloads • 
+                                                <strong>Individual:</strong> Choose each file location
+                                            </small>
+                                        </div>
                                     </div>
                                     
                                     <!-- Results Display -->
@@ -382,7 +392,7 @@
                     <div class="settings-layout">
                         <div class="settings-header">
                             <h3><i class="fas fa-cog"></i> Application Settings</h3>
-                            <p>Configure your Aura PDF App preferences</p>
+                            <p>Configure your Aura PDF™ preferences</p>
                         </div>
                         
                         <div class="settings-content">
@@ -425,6 +435,47 @@
                                     <input type="checkbox" checked>
                                 </div>
                             </div>
+                            
+                            <div class="settings-section">
+                                <h4><i class="fas fa-info-circle"></i> About Aura PDF™</h4>
+                                <div class="about-content">
+                                    <div class="about-logo">
+                                        <i class="fas fa-file-pdf"></i>
+                                        <h3>Aura PDF™</h3>
+                                    </div>
+                                    <div class="about-details">
+                                        <p class="about-description">
+                                            Smart PDF Management Tool for bulk renaming, splitting, and pattern-based file organization.
+                                        </p>
+                                        <div class="about-info">
+                                            <div class="info-item">
+                                                <i class="fas fa-user"></i>
+                                                <span><strong>Developer:</strong> Matovu Wycliff</span>
+                                            </div>
+                                            <div class="info-item">
+                                                <i class="fas fa-map-marker-alt"></i>
+                                                <span><strong>Location:</strong> Uganda</span>
+                                            </div>
+                                            <div class="info-item">
+                                                <i class="fas fa-envelope"></i>
+                                                <span><strong>Email:</strong> <a href="mailto:juncliff44@gmail.com">juncliff44@gmail.com</a></span>
+                                            </div>
+                                            <div class="info-item">
+                                                <i class="fas fa-copyright"></i>
+                                                <span><strong>Trademark:</strong> Aura PDF™</span>
+                                            </div>
+                                            <div class="info-item">
+                                                <i class="fas fa-code"></i>
+                                                <span><strong>Version:</strong> 2.0.0</span>
+                                            </div>
+                                            <div class="info-item">
+                                                <i class="fas fa-github"></i>
+                                                <span><strong>GitHub:</strong> <a href="https://github.com/matovuwycliff" target="_blank">github.com/matovuwycliff</a></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -437,7 +488,7 @@
                 <span id="statusText">Ready</span>
             </div>
             <div class="app-info">
-                <span>Aura PDF App v1.0.0</span>
+                <span>Aura PDF™ v2.0.0</span>
             </div>
         </footer>
     </div>
@@ -565,17 +616,11 @@
                         <input type="number" id="pagesPerFile" value="1" min="1">
                     </div>
                     <div class="form-group">
-                        <label for="outputDirectory">Output Directory:</label>
-                        <div class="input-group">
-                            <input type="text" id="outputDirectory" readonly placeholder="Select output directory">
-                            <button class="btn btn-secondary" id="selectOutputDir">Browse</button>
-                        </div>
-                    </div>
-                    <div class="form-group">
                         <label>
-                            <input type="checkbox" id="createZip">
+                            <input type="checkbox" id="createZip" checked>
                             Create ZIP archive of split files
                         </label>
+                        <small class="form-text text-muted">Files will be automatically saved to a dedicated folder in Downloads</small>
                     </div>
                     </div>
                     
@@ -641,7 +686,15 @@
                 downloadFile: (filePath, downloadName) => ipcRenderer.invoke('download-file', filePath, downloadName),
                 createZip: (files, outputPath) => ipcRenderer.invoke('create-zip', files, outputPath),
                 fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath),
-                getAppInfo: () => ipcRenderer.invoke('get-app-info')
+                getAppInfo: () => ipcRenderer.invoke('get-app-info'),
+                openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
+                createSplitFolder: (folderName, splitResults) => ipcRenderer.invoke('create-split-folder', folderName, splitResults),
+                createZipFromSplitResults: (splitResults, zipName) => ipcRenderer.invoke('create-zip-from-split-results', splitResults, zipName),
+                getDownloadsPath: () => ipcRenderer.invoke('get-downloads-path'),
+                createFolder: (folderPath) => ipcRenderer.invoke('create-folder', folderPath),
+                writeFile: (filePath, data) => ipcRenderer.invoke('write-pdf-file', filePath, data),
+                downloadAllSplitFiles: (splitResults, baseFileName) => ipcRenderer.invoke('download-all-split-files', splitResults, baseFileName),
+                downloadAllSplitFilesV2: (splitResults, baseFileName) => ipcRenderer.invoke('download-all-split-files-v2', splitResults, baseFileName)
             };
             
             console.log('Electron API set up successfully');

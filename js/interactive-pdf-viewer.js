@@ -60,12 +60,12 @@ class InteractivePDFViewer {
             console.error('Selection mode button NOT FOUND!');
         }
         
-        // Selection canvas events
+        // Selection canvas events - Smart Click-to-Select
         if (this.selectionCanvas) {
-            console.log('Selection canvas found, binding mouse events');
-            this.selectionCanvas.addEventListener('mousedown', (e) => this.startSelection(e));
-            this.selectionCanvas.addEventListener('mousemove', (e) => this.updateSelection(e));
-            this.selectionCanvas.addEventListener('mouseup', (e) => this.endSelection(e));
+            console.log('Selection canvas found, binding smart click events');
+            this.selectionCanvas.addEventListener('click', (e) => this.handleSmartClick(e));
+            this.selectionCanvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+            this.selectionCanvas.addEventListener('mouseleave', (e) => this.handleMouseLeave(e));
         } else {
             console.error('Selection canvas NOT FOUND!');
         }
@@ -190,6 +190,7 @@ class InteractivePDFViewer {
     
     async extractTextItems(page, viewport) {
         this.textItems = [];
+        this.clickableZones = [];
         
         try {
             const textContent = await page.getTextContent();
@@ -201,19 +202,116 @@ class InteractivePDFViewer {
                 const width = textItem.width * viewport.scale;
                 const height = textItem.height * viewport.scale;
                 
-                this.textItems.push({
+                const textItemData = {
                     text: textItem.str,
                     x: x,
                     y: y - height, // Adjust for top-left origin
                     width: width,
                     height: height,
-                    index: index
+                    index: index,
+                    fontSize: textItem.height * viewport.scale,
+                    fontName: textItem.fontName
+                };
+                
+                this.textItems.push(textItemData);
+                
+                // Create clickable zone for smart detection
+                this.clickableZones.push({
+                    ...textItemData,
+                    clickable: true,
+                    type: 'word'
                 });
             });
+            
+            // Group nearby text items into lines for better click detection
+            this.groupTextIntoLines();
+            
+            // Show visual indicators for selectable text
+            this.highlightSelectableText();
             
         } catch (error) {
             console.error('Error extracting text items:', error);
         }
+    }
+    
+    groupTextIntoLines() {
+        if (!this.textItems.length) return;
+        
+        // Sort by Y position first, then X position
+        const sortedItems = [...this.textItems].sort((a, b) => {
+            const yDiff = Math.abs(a.y - b.y);
+            if (yDiff < 8) { // Same line tolerance
+                return a.x - b.x;
+            }
+            return a.y - b.y;
+        });
+        
+        this.textLines = [];
+        let currentLine = [];
+        let currentY = sortedItems[0].y;
+        
+        sortedItems.forEach(item => {
+            if (Math.abs(item.y - currentY) < 8) {
+                // Same line
+                currentLine.push(item);
+            } else {
+                // New line
+                if (currentLine.length > 0) {
+                    this.textLines.push({
+                        items: currentLine,
+                        text: currentLine.map(i => i.text).join(' '),
+                        x: Math.min(...currentLine.map(i => i.x)),
+                        y: currentY,
+                        width: Math.max(...currentLine.map(i => i.x + i.width)) - Math.min(...currentLine.map(i => i.x)),
+                        height: Math.max(...currentLine.map(i => i.height))
+                    });
+                }
+                currentLine = [item];
+                currentY = item.y;
+            }
+        });
+        
+        // Add the last line
+        if (currentLine.length > 0) {
+            this.textLines.push({
+                items: currentLine,
+                text: currentLine.map(i => i.text).join(' '),
+                x: Math.min(...currentLine.map(i => i.x)),
+                y: currentY,
+                width: Math.max(...currentLine.map(i => i.x + i.width)) - Math.min(...currentLine.map(i => i.x)),
+                height: Math.max(...currentLine.map(i => i.height))
+            });
+        }
+        
+        // Add line clickable zones
+        this.textLines.forEach(line => {
+            this.clickableZones.push({
+                ...line,
+                clickable: true,
+                type: 'line'
+            });
+        });
+    }
+    
+    highlightSelectableText() {
+        if (!this.selectionCanvas || !this.clickableZones.length) return;
+        
+        const ctx = this.selectionCanvas.getContext('2d');
+        ctx.clearRect(0, 0, this.selectionCanvas.width, this.selectionCanvas.height);
+        
+        // Draw subtle highlights for selectable text
+        this.clickableZones.forEach(zone => {
+            if (zone.type === 'word' && zone.text.trim()) {
+                // Draw subtle border around words
+                ctx.strokeStyle = 'rgba(0, 123, 255, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(zone.x, zone.y, zone.width, zone.height);
+            } else if (zone.type === 'line') {
+                // Draw subtle background for lines
+                ctx.fillStyle = 'rgba(0, 123, 255, 0.05)';
+                ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
+            }
+        });
     }
     
     updateSelectionCanvas(viewport) {
@@ -263,116 +361,159 @@ class InteractivePDFViewer {
         console.log('Preview container found:', !!previewContainer);
         
         if (this.selectionMode) {
-            button.innerHTML = '<i class="fas fa-times"></i> Exit Selection';
+            button.innerHTML = '<i class="fas fa-times"></i> Exit Smart Selection';
             button.classList.remove('btn-info');
             button.classList.add('btn-warning');
             overlay.classList.add('active');
             previewContainer.classList.add('selection-mode');
             
-            console.log('Selection mode enabled, overlay should be visible');
+            // Show smart selection instructions
+            this.showSmartSelectionInstructions();
+            
+            console.log('Smart selection mode enabled, overlay should be visible');
         } else {
-            button.innerHTML = '<i class="fas fa-crosshairs"></i> Selection Mode';
+            button.innerHTML = '<i class="fas fa-mouse-pointer"></i> Smart Selection';
             button.classList.remove('btn-warning');
             button.classList.add('btn-info');
             overlay.classList.remove('active');
             previewContainer.classList.remove('selection-mode');
             this.clearSelection();
+            this.hideSmartSelectionInstructions();
             
-            console.log('Selection mode disabled, overlay hidden');
+            console.log('Smart selection mode disabled, overlay hidden');
         }
     }
     
-    startSelection(e) {
+    handleSmartClick(e) {
         if (!this.selectionMode || !this.canvas) return;
         
-        this.isSelecting = true;
         const rect = this.selectionCanvas.getBoundingClientRect();
-        this.selectionStart = {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top
-        };
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
         
-        this.selectionCanvas.style.cursor = 'crosshair';
-    }
-    
-    updateSelection(e) {
-        if (!this.isSelecting || !this.selectionStart) return;
+        console.log('Smart click at:', { clickX, clickY });
         
-        const rect = this.selectionCanvas.getBoundingClientRect();
-        this.selectionEnd = {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top
-        };
+        // Find the best text element at click position
+        const selectedZone = this.findBestTextAtPosition(clickX, clickY);
         
-        this.drawSelection();
-    }
-    
-    endSelection(e) {
-        if (!this.isSelecting || !this.selectionStart) return;
-        
-        this.isSelecting = false;
-        
-        const rect = this.selectionCanvas.getBoundingClientRect();
-        this.selectionEnd = {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top
-        };
-        
-        // Create final selection
-        this.finalizeSelection();
-    }
-    
-    drawSelection() {
-        if (!this.selectionStart || !this.selectionEnd) return;
-        
-        const ctx = this.selectionCanvas.getContext('2d');
-        ctx.clearRect(0, 0, this.selectionCanvas.width, this.selectionCanvas.height);
-        
-        const x = Math.min(this.selectionStart.x, this.selectionEnd.x);
-        const y = Math.min(this.selectionStart.y, this.selectionEnd.y);
-        const width = Math.abs(this.selectionEnd.x - this.selectionStart.x);
-        const height = Math.abs(this.selectionEnd.y - this.selectionStart.y);
-        
-        // Draw selection rectangle
-        ctx.fillRect(x, y, width, height);
-        ctx.strokeRect(x, y, width, height);
-    }
-    
-    finalizeSelection() {
-        if (!this.selectionStart || !this.selectionEnd) return;
-        
-        const x = Math.min(this.selectionStart.x, this.selectionEnd.x);
-        const y = Math.min(this.selectionStart.y, this.selectionEnd.y);
-        const width = Math.abs(this.selectionEnd.x - this.selectionStart.x);
-        const height = Math.abs(this.selectionEnd.y - this.selectionStart.y);
-        
-        // Minimum selection size
-        if (width < 10 || height < 10) {
+        if (selectedZone) {
+            console.log('Selected zone:', selectedZone);
+            this.createSelectionFromZone(selectedZone);
+        } else {
+            console.log('No text found at click position');
             this.clearSelection();
-            return;
+        }
+    }
+    
+    handleMouseMove(e) {
+        if (!this.selectionMode) return;
+        
+        const rect = this.selectionCanvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        // Find hovered text element
+        const hoveredZone = this.findBestTextAtPosition(mouseX, mouseY);
+        
+        if (hoveredZone) {
+            this.selectionCanvas.style.cursor = 'pointer';
+            this.highlightHoveredText(hoveredZone);
+        } else {
+            this.selectionCanvas.style.cursor = 'default';
+            this.clearHoverHighlight();
+        }
+    }
+    
+    handleMouseLeave(e) {
+        this.clearHoverHighlight();
+        this.selectionCanvas.style.cursor = 'default';
+    }
+    
+    findBestTextAtPosition(x, y) {
+        if (!this.clickableZones || !this.clickableZones.length) return null;
+        
+        // First, try to find exact word matches
+        const wordMatches = this.clickableZones.filter(zone => 
+            zone.type === 'word' && 
+            zone.clickable &&
+            x >= zone.x && x <= zone.x + zone.width &&
+            y >= zone.y && y <= zone.y + zone.height
+        );
+        
+        if (wordMatches.length > 0) {
+            // Return the closest word
+            return wordMatches.reduce((closest, current) => {
+                const closestDist = Math.sqrt(
+                    Math.pow(x - (closest.x + closest.width/2), 2) + 
+                    Math.pow(y - (closest.y + closest.height/2), 2)
+                );
+                const currentDist = Math.sqrt(
+                    Math.pow(x - (current.x + current.width/2), 2) + 
+                    Math.pow(y - (current.y + current.height/2), 2)
+                );
+                return currentDist < closestDist ? current : closest;
+            });
         }
         
-        // Convert to PDF coordinates (accounting for zoom and canvas positioning)
-        const canvasRect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / canvasRect.width;
-        const scaleY = this.canvas.height / canvasRect.height;
+        // If no word match, try line matches
+        const lineMatches = this.clickableZones.filter(zone => 
+            zone.type === 'line' && 
+            zone.clickable &&
+            x >= zone.x && x <= zone.x + zone.width &&
+            y >= zone.y && y <= zone.y + zone.height
+        );
         
+        if (lineMatches.length > 0) {
+            return lineMatches[0]; // Return first line match
+        }
+        
+        // If no exact match, find the closest text within tolerance
+        const tolerance = 20; // 20px tolerance
+        const nearbyZones = this.clickableZones.filter(zone => 
+            zone.clickable &&
+            Math.abs(x - (zone.x + zone.width/2)) < tolerance &&
+            Math.abs(y - (zone.y + zone.height/2)) < tolerance
+        );
+        
+        if (nearbyZones.length > 0) {
+            // Return the closest one
+            return nearbyZones.reduce((closest, current) => {
+                const closestDist = Math.sqrt(
+                    Math.pow(x - (closest.x + closest.width/2), 2) + 
+                    Math.pow(y - (closest.y + closest.height/2), 2)
+                );
+                const currentDist = Math.sqrt(
+                    Math.pow(x - (current.x + current.width/2), 2) + 
+                    Math.pow(y - (current.y + current.height/2), 2)
+                );
+                return currentDist < closestDist ? current : closest;
+            });
+        }
+        
+        return null;
+    }
+    
+    createSelectionFromZone(zone) {
+        // Convert zone to selection format
         this.currentSelection = {
             page: this.currentPage,
-            x: Math.round((x * scaleX) / this.zoomLevel),
-            y: Math.round((y * scaleY) / this.zoomLevel),
-            width: Math.round((width * scaleX) / this.zoomLevel),
-            height: Math.round((height * scaleY) / this.zoomLevel),
-            displayX: x,
-            displayY: y,
-            displayWidth: width,
-            displayHeight: height,
-            zoom: this.zoomLevel
+            x: Math.round(zone.x / this.zoomLevel),
+            y: Math.round(zone.y / this.zoomLevel),
+            width: Math.round(zone.width / this.zoomLevel),
+            height: Math.round(zone.height / this.zoomLevel),
+            displayX: zone.x,
+            displayY: zone.y,
+            displayWidth: zone.width,
+            displayHeight: zone.height,
+            zoom: this.zoomLevel,
+            extractedText: zone.text || zone.text,
+            zoneType: zone.type
         };
         
-        // Extract text from selection
-        const extractedText = this.extractTextFromSelection(this.currentSelection);
-        this.currentSelection.extractedText = extractedText;
+        console.log('Created selection from zone:', this.currentSelection);
+        
+        // Draw the selection
+        this.drawFinalSelection();
         
         // Update UI
         this.updateSelectionDetails();
@@ -383,8 +524,6 @@ class InteractivePDFViewer {
             selectionDetails.style.display = 'block';
         }
         
-        // Make selection permanent
-        
         // Notify the app that a selection was made
         if (window.app && typeof window.app.onSelectionMade === 'function') {
             window.app.onSelectionMade(this.currentSelection);
@@ -394,11 +533,80 @@ class InteractivePDFViewer {
         if (window.filesPatternsTabManager && typeof window.filesPatternsTabManager.onSelectionMade === 'function') {
             console.log('Interactive PDF Viewer: Notifying Files & Patterns tab manager');
             window.filesPatternsTabManager.onSelectionMade(this.currentSelection);
-        } else {
-            console.log('Interactive PDF Viewer: Files & Patterns tab manager not available');
         }
-        this.drawFinalSelection();
     }
+    
+    highlightHoveredText(zone) {
+        if (!this.selectionCanvas) return;
+        
+        const ctx = this.selectionCanvas.getContext('2d');
+        
+        // Clear previous hover highlight
+        this.clearHoverHighlight();
+        
+        // Draw hover highlight
+        ctx.strokeStyle = 'rgba(0, 123, 255, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(0, 123, 255, 0.1)';
+        
+        ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
+        ctx.strokeRect(zone.x, zone.y, zone.width, zone.height);
+    }
+    
+    clearHoverHighlight() {
+        if (!this.selectionCanvas) return;
+        
+        // Redraw the base highlights without hover
+        this.highlightSelectableText();
+        
+        // Redraw current selection if exists
+        if (this.currentSelection) {
+            this.drawFinalSelection();
+        }
+    }
+    
+    showSmartSelectionInstructions() {
+        // Create or update instructions overlay
+        let instructionsOverlay = document.getElementById('smartSelectionInstructions');
+        if (!instructionsOverlay) {
+            instructionsOverlay = document.createElement('div');
+            instructionsOverlay.id = 'smartSelectionInstructions';
+            instructionsOverlay.className = 'smart-selection-instructions';
+            document.getElementById('pdfPreviewContainer').appendChild(instructionsOverlay);
+        }
+        
+        instructionsOverlay.innerHTML = `
+            <div class="instructions-content">
+                <div class="instructions-icon">
+                    <i class="fas fa-mouse-pointer"></i>
+                </div>
+                <div class="instructions-text">
+                    <h4>Smart Text Selection</h4>
+                    <p><strong>Click on any text</strong> to automatically select it</p>
+                    <p>• <strong>Words:</strong> Click to select individual words</p>
+                    <p>• <strong>Lines:</strong> Click to select entire lines</p>
+                    <p>• <strong>Smart Detection:</strong> Automatically finds the best match</p>
+                    <p>• <strong>High Accuracy:</strong> Professional-grade text extraction</p>
+                </div>
+                <div class="instructions-close">
+                    <button class="btn btn-sm btn-outline" onclick="this.parentElement.parentElement.parentElement.style.display='none'">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        instructionsOverlay.style.display = 'block';
+    }
+    
+    hideSmartSelectionInstructions() {
+        const instructionsOverlay = document.getElementById('smartSelectionInstructions');
+        if (instructionsOverlay) {
+            instructionsOverlay.style.display = 'none';
+        }
+    }
+    
+    // Old drag selection methods removed - now using smart click-to-select
     
     extractTextFromSelection(selection) {
         console.log('Interactive PDF Viewer: extractTextFromSelection called with:', selection);
@@ -406,15 +614,21 @@ class InteractivePDFViewer {
         
         const extractedItems = [];
         
-        // Convert selection coordinates back to text coordinate system
+        // Improved coordinate conversion with better scaling
+        const canvasRect = this.canvas.getBoundingClientRect();
+        const scaleX = this.canvas.width / canvasRect.width;
+        const scaleY = this.canvas.height / canvasRect.height;
+        
+        // Convert selection coordinates to PDF coordinate system more accurately
         const selectionRect = {
-            left: selection.x * this.zoomLevel,
-            top: selection.y * this.zoomLevel,
-            right: (selection.x + selection.width) * this.zoomLevel,
-            bottom: (selection.y + selection.height) * this.zoomLevel
+            left: selection.x * scaleX,
+            top: selection.y * scaleY,
+            right: (selection.x + selection.width) * scaleX,
+            bottom: (selection.y + selection.height) * scaleY
         };
         
-        console.log('Interactive PDF Viewer: Selection rect:', selectionRect);
+        console.log('Interactive PDF Viewer: Selection rect (improved):', selectionRect);
+        console.log('Interactive PDF Viewer: Canvas scale factors:', { scaleX, scaleY });
         
         this.textItems.forEach(item => {
             const itemRect = {
@@ -424,17 +638,18 @@ class InteractivePDFViewer {
                 bottom: item.y + item.height
             };
             
-            // Check if text item intersects with selection
-            if (this.rectanglesIntersect(selectionRect, itemRect)) {
+            // Check if text item intersects with selection (with tolerance for better accuracy)
+            if (this.rectanglesIntersectWithTolerance(selectionRect, itemRect, 3)) {
                 extractedItems.push(item);
             }
         });
         
         console.log('Interactive PDF Viewer: Extracted items:', extractedItems.length);
         
-        // Sort by position (top to bottom, left to right)
+        // Sort by position (top to bottom, left to right) with improved tolerance
         extractedItems.sort((a, b) => {
-            if (Math.abs(a.y - b.y) < 5) { // Same line
+            const yDiff = Math.abs(a.y - b.y);
+            if (yDiff < 8) { // Increased tolerance for same line detection
                 return a.x - b.x;
             }
             return a.y - b.y;
@@ -468,6 +683,21 @@ class InteractivePDFViewer {
                 rect1.left > rect2.right || 
                 rect1.bottom < rect2.top || 
                 rect1.top > rect2.bottom);
+    }
+    
+    rectanglesIntersectWithTolerance(rect1, rect2, tolerance = 3) {
+        // Expand rect1 by tolerance to catch nearby text
+        const expandedRect1 = {
+            left: rect1.left - tolerance,
+            top: rect1.top - tolerance,
+            right: rect1.right + tolerance,
+            bottom: rect1.bottom + tolerance
+        };
+        
+        return !(expandedRect1.right < rect2.left || 
+                expandedRect1.left > rect2.right || 
+                expandedRect1.bottom < rect2.top || 
+                expandedRect1.top > rect2.bottom);
     }
     
     drawFinalSelection() {

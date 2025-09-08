@@ -1,7 +1,7 @@
 {
   "name": "aura-pdf",
-  "version": "1.0.0",
-  "description": "Aura PDF - Smart PDF Management Tool",
+  "version": "2.0.0",
+  "description": "Aura PDF™ - Smart PDF Management Tool by Matovu Wycliff",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -16,9 +16,16 @@
     "rename",
     "split",
     "electron",
-    "offline"
+    "offline",
+    "aura",
+    "matovu",
+    "wycliff"
   ],
-  "author": "PDF Tools",
+  "author": {
+    "name": "Matovu Wycliff",
+    "email": "juncliff44@gmail.com",
+    "url": "https://github.com/matovuwycliff"
+  },
   "license": "MIT",
   "devDependencies": {
     "@electron-forge/cli": "^7.8.3",
@@ -38,7 +45,7 @@
   },
   "build": {
     "appId": "com.aura.pdf",
-    "productName": "Aura PDF",
+    "productName": "Aura PDF™",
     "directories": {
       "output": "dist"
     },
@@ -74,21 +81,22 @@
         }
       ],
       "requestedExecutionLevel": "asInvoker",
-      "verifyUpdateCodeSignature": false
+      "verifyUpdateCodeSignature": false,
+      "icon": "assets/icons/aura-icon.png"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Aura PDF",
+      "shortcutName": "Aura PDF™",
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": true,
       "menuCategory": "PDF Tools",
       "allowElevation": true,
       "perMachine": false,
       "warningsAsErrors": false,
-      "uninstallDisplayName": "Aura PDF",
+      "uninstallDisplayName": "Aura PDF™",
       "installerIcon": null,
       "uninstallerIcon": null
     },
@@ -102,7 +110,8 @@
             "arm64"
           ]
         }
-      ]
+      ],
+      "icon": "assets/icons/aura-icon.png"
     },
     "linux": {
       "target": "AppImage"

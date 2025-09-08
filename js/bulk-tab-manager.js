@@ -652,7 +652,10 @@ class BulkTabManager {
             }
         }
 
-        // Show results
+        // Show completion popup
+        this.showBulkRenameCompletionPopup(successCount, errorCount, errors);
+        
+        // Also update status
         if (errorCount === 0) {
             this.setStatus(`Bulk rename completed! Successfully renamed: ${successCount} files`);
         } else {
@@ -1158,6 +1161,207 @@ class BulkTabManager {
             console.error('Error refreshing file data:', error);
             return false;
         }
+    }
+    
+    showBulkRenameCompletionPopup(successCount, errorCount, errors) {
+        console.log('Bulk Tab: Showing completion popup:', { successCount, errorCount, errors: errors.length });
+        
+        // Create completion popup modal
+        const modal = document.createElement('div');
+        modal.className = 'completion-modal';
+        modal.innerHTML = `
+            <div class="completion-content">
+                <div class="completion-header">
+                    <div class="completion-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h3>Bulk Rename Complete!</h3>
+                </div>
+                <div class="completion-body">
+                    <div class="completion-stats">
+                        <div class="stat-item success">
+                            <i class="fas fa-check"></i>
+                            <span>Successfully renamed: ${successCount} files</span>
+                        </div>
+                        ${errorCount > 0 ? `
+                        <div class="stat-item error">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span>Errors: ${errorCount} files</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                    ${errorCount > 0 ? `
+                    <div class="error-details">
+                        <h4>Error Details:</h4>
+                        <div class="error-list">
+                            ${errors.slice(0, 5).map(error => `<div class="error-item">${error}</div>`).join('')}
+                            ${errors.length > 5 ? `<div class="error-item">... and ${errors.length - 5} more errors</div>` : ''}
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+                <div class="completion-footer">
+                    <button class="btn btn-primary" onclick="this.closest('.completion-modal').remove()">
+                        <i class="fas fa-check"></i> Got it!
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Add modal styles if not already added
+        if (!document.getElementById('completion-modal-styles')) {
+            const style = document.createElement('style');
+            style.id = 'completion-modal-styles';
+            style.textContent = `
+                .completion-modal {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.7);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 99999;
+                    animation: fadeIn 0.3s ease;
+                }
+                
+                .completion-content {
+                    background: white;
+                    border-radius: 12px;
+                    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+                    max-width: 500px;
+                    width: 90%;
+                    max-height: 80vh;
+                    overflow-y: auto;
+                    animation: slideIn 0.3s ease;
+                }
+                
+                .completion-header {
+                    text-align: center;
+                    padding: 30px 30px 20px;
+                    border-bottom: 1px solid #eee;
+                }
+                
+                .completion-icon {
+                    font-size: 48px;
+                    color: #28a745;
+                    margin-bottom: 15px;
+                }
+                
+                .completion-header h3 {
+                    margin: 0;
+                    color: #333;
+                    font-size: 24px;
+                    font-weight: 600;
+                }
+                
+                .completion-body {
+                    padding: 20px 30px;
+                }
+                
+                .completion-stats {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    margin-bottom: 20px;
+                }
+                
+                .stat-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 10px;
+                    border-radius: 8px;
+                    font-weight: 500;
+                }
+                
+                .stat-item.success {
+                    background: #d4edda;
+                    color: #155724;
+                }
+                
+                .stat-item.error {
+                    background: #f8d7da;
+                    color: #721c24;
+                }
+                
+                .stat-item i {
+                    font-size: 16px;
+                }
+                
+                .error-details {
+                    margin-top: 20px;
+                }
+                
+                .error-details h4 {
+                    margin: 0 0 10px 0;
+                    color: #721c24;
+                    font-size: 16px;
+                }
+                
+                .error-list {
+                    max-height: 150px;
+                    overflow-y: auto;
+                    border: 1px solid #f5c6cb;
+                    border-radius: 6px;
+                    padding: 10px;
+                    background: #f8f9fa;
+                }
+                
+                .error-item {
+                    padding: 5px 0;
+                    font-size: 14px;
+                    color: #721c24;
+                    border-bottom: 1px solid #f5c6cb;
+                }
+                
+                .error-item:last-child {
+                    border-bottom: none;
+                }
+                
+                .completion-footer {
+                    padding: 20px 30px 30px;
+                    text-align: center;
+                    border-top: 1px solid #eee;
+                }
+                
+                .completion-footer .btn {
+                    padding: 12px 30px;
+                    font-size: 16px;
+                    font-weight: 600;
+                }
+                
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                
+                @keyframes slideIn {
+                    from { 
+                        opacity: 0;
+                        transform: translateY(-30px) scale(0.95);
+                    }
+                    to { 
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        document.body.appendChild(modal);
+        console.log('Bulk Tab: Completion popup modal added to DOM');
+        
+        // Auto-remove after 10 seconds if not manually closed
+        setTimeout(() => {
+            if (modal.parentNode) {
+                console.log('Bulk Tab: Auto-removing completion popup after 10 seconds');
+                modal.remove();
+            }
+        }, 10000);
     }
 }
 

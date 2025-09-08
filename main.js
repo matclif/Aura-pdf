@@ -1,6 +1,36 @@
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+
+// App metadata
+app.setName('Aura PDF™');
+app.setAppUserModelId('com.aura.pdf');
+
+// Performance optimizations for faster startup
+app.commandLine.appendSwitch('--disable-background-timer-throttling');
+app.commandLine.appendSwitch('--disable-renderer-backgrounding');
+app.commandLine.appendSwitch('--disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('--disable-features', 'TranslateUI');
+app.commandLine.appendSwitch('--disable-ipc-flooding-protection');
+
+// Windows-specific optimizations
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('--disable-gpu-sandbox');
+  app.commandLine.appendSwitch('--disable-software-rasterizer');
+  app.commandLine.appendSwitch('--disable-gpu');
+  app.commandLine.appendSwitch('--no-sandbox');
+  app.commandLine.appendSwitch('--disable-setuid-sandbox');
+  app.commandLine.appendSwitch('--disable-dev-shm-usage');
+  app.commandLine.appendSwitch('--disable-extensions');
+  app.commandLine.appendSwitch('--disable-plugins');
+  app.commandLine.appendSwitch('--disable-default-apps');
+  app.commandLine.appendSwitch('--disable-sync');
+  app.commandLine.appendSwitch('--disable-background-networking');
+  app.commandLine.appendSwitch('--disable-client-side-phishing-detection');
+  app.commandLine.appendSwitch('--disable-component-update');
+  app.commandLine.appendSwitch('--disable-domain-reliability');
+  app.commandLine.appendSwitch('--disable-features', 'VizDisplayCompositor');
+}
 const { PDFDocument } = require('pdf-lib');
 
 // Keep a global reference of the window object
@@ -20,19 +50,18 @@ function createWindow() {
       webSecurity: true, // Enable web security
       backgroundThrottling: false,
       preload: false, // Disable preload for faster startup
-      allowRunningInsecureContent: false, // Disable insecure content
-      // Windows-specific settings
+      // Additional performance optimizations
+      offscreen: false,
       experimentalFeatures: false,
       enableBlinkFeatures: '',
-      disableBlinkFeatures: '',
-      // Ensure proper file access on Windows
-      additionalArguments: []
+      disableBlinkFeatures: 'Auxclick',
+      allowRunningInsecureContent: false // Disable insecure content
     },
-    icon: path.join(__dirname, 'assets', 'icon.png'),
+    icon: path.join(__dirname, 'assets', 'icons', 'aura-icon.png'),
     titleBarStyle: 'default',
     show: false,
     backgroundColor: '#2c3e50',
-    title: 'Aura PDF App',
+    title: 'Aura PDF™ - Smart PDF Management Tool by Matovu Wycliff',
     frame: true,
     transparent: false,
     hasShadow: true,
@@ -404,9 +433,17 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
     const results = [];
     const fileName = path.basename(filePath, '.pdf');
     
-    // If no output directory specified, use downloads folder
+    // If no output directory specified, create a dedicated folder in Downloads
     if (!outputDir) {
-      outputDir = path.join(require('os').homedir(), 'Downloads');
+      const downloadsDir = path.join(require('os').homedir(), 'Downloads');
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      outputDir = path.join(downloadsDir, `Aura PDF Split - ${fileName} - ${timestamp}`);
+    }
+    
+    // Create the output directory if it doesn't exist
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+      console.log('Created output directory:', outputDir);
     }
     
     const tempDir = createZip ? path.join(require('os').tmpdir(), `pdf-split-${Date.now()}`) : outputDir;
@@ -688,7 +725,8 @@ ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, cre
       success: true,
       results: results,
       totalFiles: results.length,
-      zipPath: zipPath
+      zipPath: zipPath,
+      outputDir: outputDir
     };
   } catch (error) {
     return {
@@ -928,6 +966,271 @@ ipcMain.handle('file-exists', async (event, filePath) => {
   } catch (error) {
     console.error('Error checking file existence:', error);
     return false;
+  }
+});
+
+// Open folder in file explorer
+ipcMain.handle('open-folder', async (event, folderPath) => {
+  try {
+    const { shell } = require('electron');
+    await shell.openPath(folderPath);
+    return { success: true };
+  } catch (error) {
+    console.error('Error opening folder:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Get Downloads folder path
+ipcMain.handle('get-downloads-path', async (event) => {
+  try {
+    const downloadsDir = path.join(require('os').homedir(), 'Downloads');
+    console.log('Backend: Downloads path:', downloadsDir);
+    console.log('Backend: Path normalized:', path.normalize(downloadsDir));
+    return { success: true, path: path.normalize(downloadsDir) };
+  } catch (error) {
+    console.error('Error getting Downloads path:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Create folder
+ipcMain.handle('create-folder', async (event, folderPath) => {
+  try {
+    console.log('Backend: Creating folder:', folderPath);
+    console.log('Backend: Folder exists?', fs.existsSync(folderPath));
+    
+    if (!fs.existsSync(folderPath)) {
+      fs.mkdirSync(folderPath, { recursive: true });
+      console.log('Backend: Created folder:', folderPath);
+    } else {
+      console.log('Backend: Folder already exists:', folderPath);
+    }
+    return { success: true, path: folderPath };
+  } catch (error) {
+    console.error('Backend: Error creating folder:', error);
+    console.error('Backend: Folder path was:', folderPath);
+    return { success: false, error: error.message };
+  }
+});
+
+// Download all split files to Downloads folder (CORRECTED IMPLEMENTATION)
+ipcMain.handle('download-all-split-files-v2', async (event, splitResults, originalFileName) => {
+    try {
+        console.log('=== BACKEND v1.0.3 - Download All Split Files (CORRECTED) ===');
+        console.log('Backend: Starting download all split files');
+        console.log('Backend: Number of files:', splitResults.length);
+        console.log('Backend: Original file name:', originalFileName);
+        
+        // Get the base downloads path from the Electron app API
+        const downloadsPath = app.getPath('downloads');
+        console.log('Backend: Downloads path from app.getPath():', downloadsPath);
+        
+        // Sanitize the original file name to create a safe folder name
+        const baseName = path.basename(originalFileName, path.extname(originalFileName));
+        const folderName = `${baseName}_split_pages`;
+        
+        // CRITICAL: Correctly join the paths using path.join()
+        const folderPath = path.join(downloadsPath, folderName);
+        console.log(`Backend: Attempting to create directory: ${folderPath}`);
+
+        // Use fs.mkdirSync with recursive option to create the folder and all its parent directories
+        if (!fs.existsSync(folderPath)) {
+            fs.mkdirSync(folderPath, { recursive: true });
+            console.log('Backend: Created directory:', folderPath);
+        } else {
+            console.log('Backend: Directory already exists:', folderPath);
+        }
+
+        let totalFiles = 0;
+        for (let i = 0; i < splitResults.length; i++) {
+            const result = splitResults[i];
+            const fileName = `page_${i + 1}.pdf`;
+            const outputFilePath = path.join(folderPath, fileName);
+            console.log(`Backend: Writing file ${i + 1} to: ${outputFilePath}`);
+            
+            // Write the file buffer to the correct path
+            fs.writeFileSync(outputFilePath, Buffer.from(result.data));
+            totalFiles++;
+        }
+
+        console.log('Backend: All files saved successfully');
+        console.log('Backend: Total files saved:', totalFiles);
+
+        return {
+            success: true,
+            folderPath: folderPath,
+            totalFiles: totalFiles
+        };
+    } catch (error) {
+        console.error('Backend Error (downloadAllSplitFiles):', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+});
+
+// Create split folder and save all files
+ipcMain.handle('create-split-folder', async (event, folderName, splitResults) => {
+  try {
+    const downloadsDir = path.join(require('os').homedir(), 'Downloads');
+    const folderPath = path.join(downloadsDir, folderName);
+    
+    // Create the folder
+    if (!fs.existsSync(folderPath)) {
+      fs.mkdirSync(folderPath, { recursive: true });
+      console.log('Created split folder:', folderPath);
+    }
+    
+    // Save all split files to the folder
+    const savedFiles = [];
+    for (const result of splitResults) {
+      const filePath = path.join(folderPath, result.name);
+      fs.writeFileSync(filePath, result.data);
+      savedFiles.push(filePath);
+    }
+    
+    return {
+      success: true,
+      folderPath: folderPath,
+      totalFiles: splitResults.length,
+      savedFiles: savedFiles
+    };
+    
+  } catch (error) {
+    console.error('Error creating split folder:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Create ZIP from split results (CORRECTED IMPLEMENTATION)
+ipcMain.handle('create-zip-from-split-results', async (event, splitResults, zipName) => {
+  try {
+    console.log('=== BACKEND v1.0.3 - Create ZIP (CORRECTED) ===');
+    console.log('Backend: Creating ZIP from split results');
+    console.log('Backend: Number of files:', splitResults.length);
+    console.log('Backend: ZIP name:', zipName);
+    
+    // Get the base downloads path from the Electron app API
+    const downloadsPath = app.getPath('downloads');
+    console.log('Backend: Downloads path from app.getPath():', downloadsPath);
+    
+    // CRITICAL: Correctly join the paths using path.join()
+    const zipPath = path.join(downloadsPath, zipName);
+    console.log('Backend: ZIP path:', zipPath);
+    
+    // Use yazl for Windows-compatible ZIP creation
+    const yazl = require('yazl');
+    const zipfile = new yazl.ZipFile();
+    
+    // Add files to ZIP with proper Windows compatibility
+    let filesAdded = 0;
+    const tempFiles = []; // Track temp files for cleanup
+    
+    for (let i = 0; i < splitResults.length; i++) {
+      const result = splitResults[i];
+      if (result.data) {
+        try {
+          // Extract just the filename from the full path
+          const fileName = path.basename(result.name);
+          console.log(`Processing file ${i + 1}: ${fileName}`);
+          
+          // Create a temporary file for the ZIP with a safe name
+          const safeFileName = `temp_${Date.now()}_${i}_${fileName.replace(/[<>:"/\\|?*]/g, '_')}`;
+          const tempFilePath = path.join(require('os').tmpdir(), safeFileName);
+          
+          console.log('Creating temp file:', tempFilePath);
+          
+          // Use async file writing to prevent blocking
+          await new Promise((resolve, reject) => {
+            fs.writeFile(tempFilePath, result.data, (err) => {
+              if (err) {
+                console.error(`Error writing temp file ${i + 1}:`, err);
+                reject(err);
+              } else {
+                console.log(`Temp file created: ${tempFilePath}`);
+                tempFiles.push(tempFilePath);
+                resolve();
+              }
+            });
+          });
+          
+          // Sanitize file name for Windows compatibility
+          const sanitizedName = fileName.replace(/[<>:"/\\|?*]/g, '_');
+          
+          // Add to ZIP with only filename (no path)
+          zipfile.addFile(tempFilePath, sanitizedName);
+          filesAdded++;
+          
+          console.log(`Added to ZIP: ${sanitizedName}`);
+          
+        } catch (fileError) {
+          console.error(`Error processing file ${i + 1}:`, fileError);
+          // Continue with other files
+        }
+      }
+    }
+    
+    console.log(`Added ${filesAdded} files to ZIP`);
+    
+    if (filesAdded === 0) {
+      throw new Error('No files were added to the ZIP archive');
+    }
+    
+    // Create the ZIP file
+    await new Promise((resolve, reject) => {
+      zipfile.outputStream.pipe(fs.createWriteStream(zipPath))
+        .on('close', () => {
+          console.log('ZIP file created successfully:', zipPath);
+          resolve();
+        })
+        .on('error', (err) => {
+          console.error('ZIP creation error:', err);
+          reject(err);
+        });
+      
+      zipfile.end();
+    });
+    
+    // Clean up temp files
+    console.log('Cleaning up temp files...');
+    for (const tempFile of tempFiles) {
+      try {
+        if (fs.existsSync(tempFile)) {
+          fs.unlinkSync(tempFile);
+          console.log('Cleaned up temp file:', tempFile);
+        }
+      } catch (cleanupError) {
+        console.warn('Could not clean up temp file:', tempFile, cleanupError);
+      }
+    }
+    
+    // Verify ZIP file was created and has content
+    if (fs.existsSync(zipPath)) {
+      const zipStats = fs.statSync(zipPath);
+      console.log('ZIP file created with size:', zipStats.size, 'bytes');
+      
+      if (zipStats.size === 0) {
+        throw new Error('ZIP file was created but is empty');
+      }
+    } else {
+      throw new Error('ZIP file was not created');
+    }
+    
+    console.log('ZIP creation completed successfully');
+    console.log('Final ZIP path:', zipPath);
+    console.log('ZIP file exists:', fs.existsSync(zipPath));
+    
+    return {
+      success: true,
+      zipPath: zipPath,
+      totalFiles: filesAdded
+    };
+    
+  } catch (error) {
+    console.error('Error creating ZIP from split results:', error);
+    return { success: false, error: error.message };
   }
 });
 

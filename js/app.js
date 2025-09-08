@@ -2793,16 +2793,49 @@ class AuraPDFApp {
     async splitAllPages(selectedFile) {
         // Use a temporary directory and always create ZIP
         // The main process will handle the downloads folder automatically
-        return await ipcRenderer.invoke('split-pdf', selectedFile.path, null, 1, true);
+        const result = await ipcRenderer.invoke('split-pdf', selectedFile.path, null, 1, true);
+        
+        // Open the output folder after successful split
+        if (result.success && result.outputDir) {
+            try {
+                await ipcRenderer.invoke('open-folder', result.outputDir);
+            } catch (error) {
+                console.error('Error opening folder:', error);
+            }
+        }
+        
+        return result;
     }
     
     async splitPageRange(selectedFile, startPage, endPage) {
         // Use the enhanced split-pdf function with page range support
-        return await ipcRenderer.invoke('split-pdf', selectedFile.path, null, null, true, startPage, endPage);
+        const result = await ipcRenderer.invoke('split-pdf', selectedFile.path, null, null, true, startPage, endPage);
+        
+        // Open the output folder after successful split
+        if (result.success && result.outputDir) {
+            try {
+                await ipcRenderer.invoke('open-folder', result.outputDir);
+            } catch (error) {
+                console.error('Error opening folder:', error);
+            }
+        }
+        
+        return result;
     }
     
     async splitByPageCount(selectedFile, pagesPerFile) {
-        return await ipcRenderer.invoke('split-pdf', selectedFile.path, null, pagesPerFile, true);
+        const result = await ipcRenderer.invoke('split-pdf', selectedFile.path, null, pagesPerFile, true);
+        
+        // Open the output folder after successful split
+        if (result.success && result.outputDir) {
+            try {
+                await ipcRenderer.invoke('open-folder', result.outputDir);
+            } catch (error) {
+                console.error('Error opening folder:', error);
+            }
+        }
+        
+        return result;
     }
     
 

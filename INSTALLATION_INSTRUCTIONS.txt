@@ -1,35 +1,113 @@
-Aura PDF - Installation Instructions
-==================================================
+========================================
+    Aura PDF™ Installation Instructions
+========================================
 
-IMPORTANT: Before installing, please follow these steps:
+Developed by: Matovu Wycliff
+Email: juncliff44@gmail.com
+Location: Uganda
+Version: 2.0.0
 
-1. CLOSE THE APP COMPLETELY
-   - If you have "Aura PDF" running, close it completely
-   - Check the system tray (bottom-right corner) and close it from there too
-   - Or run the "close-app.bat" file to force close it
+========================================
+           WINDOWS INSTALLATION
+========================================
 
-2. RUN THE INSTALLER
-   - Double-click "Aura PDF Setup 1.0.0.exe"
-   - Follow the installation wizard
-   - Choose your installation directory
-   - The installer will create a desktop shortcut automatically
+Option 1: Easy Installation (Recommended)
+----------------------------------------
+1. Double-click "install-windows.bat"
+2. Select option 1 (Install with Setup)
+3. Follow the installation wizard
+4. Aura PDF™ will be installed in your Programs folder
+5. You can find it in your Start Menu
 
-3. IF YOU GET THE "CANNOT BE CLOSED" ERROR:
-   - Click "Cancel" on the error dialog
-   - Close the app manually from Task Manager:
-     * Press Ctrl+Shift+Esc to open Task Manager
-     * Find "Aura PDF" in the Processes tab
-     * Right-click and select "End Task"
-   - Then run the installer again
+Option 2: Manual Installation
+-----------------------------
+1. Run "Aura PDF™ Setup 2.0.0.exe" from the dist folder
+2. Follow the installation wizard
+3. Choose installation directory (default: C:\Program Files\Aura PDF™)
+4. Create desktop shortcut (optional)
+5. Complete installation
 
-4. ALTERNATIVE: USE THE PORTABLE VERSION
-   - If installation continues to fail, use "Aura PDF 1.0.0.exe"
-   - This is a portable version that doesn't require installation
-   - Run "install-windows.bat" to create desktop shortcuts manually
+Option 3: Portable Version
+-------------------------
+1. Run "Aura PDF™ 2.0.0.exe" from the dist folder
+2. No installation required - runs directly
+3. You can copy this file anywhere and run it
 
-TROUBLESHOOTING:
-- If you get permission errors when renaming files, run the app as administrator
-- For cross-drive file operations, choose a destination folder you have write access to
-- The app works best when files are on the same drive
+========================================
+            MAC INSTALLATION
+========================================
 
-For support, visit: https://github.com/matclif/Aura-pdf
+Option 1: Intel Mac
+------------------
+1. Double-click "Aura PDF™-2.0.0.dmg"
+2. Drag "Aura PDF™" to your Applications folder
+3. Launch from Applications or Launchpad
+
+Option 2: Apple Silicon Mac (M1/M2/M3)
+-------------------------------------
+1. Double-click "Aura PDF™-2.0.0-arm64.dmg"
+2. Drag "Aura PDF™" to your Applications folder
+3. Launch from Applications or Launchpad
+
+Note: If you get a security warning, go to:
+System Preferences > Security & Privacy > General
+Click "Open Anyway" next to the Aura PDF™ message
+
+========================================
+           SYSTEM REQUIREMENTS
+========================================
+
+Windows:
+- Windows 10 or later
+- 64-bit processor
+- 100 MB free disk space
+- 4 GB RAM (recommended)
+
+Mac:
+- macOS 10.14 or later
+- Intel or Apple Silicon processor
+- 100 MB free disk space
+- 4 GB RAM (recommended)
+
+========================================
+              FEATURES
+========================================
+
+✓ Bulk PDF Renaming with Smart Patterns
+✓ PDF Splitting into Multiple Files
+✓ Interactive Pattern Creation
+✓ Smart Text Detection
+✓ Download All Split Files to Folder
+✓ Professional UI with Modern Design
+✓ Cross-Platform (Windows & Mac)
+✓ Offline Operation (No Internet Required)
+
+========================================
+            TROUBLESHOOTING
+========================================
+
+Windows Issues:
+- If installation fails, try running as Administrator
+- Make sure you have enough disk space
+- Check Windows Defender isn't blocking the installer
+
+Mac Issues:
+- If app won't open, right-click and select "Open"
+- Go to System Preferences > Security & Privacy > General
+- Click "Open Anyway" if prompted
+
+General Issues:
+- Make sure you have the latest version of your operating system
+- Restart your computer if the app doesn't launch
+- Check that you have sufficient RAM available
+
+========================================
+              SUPPORT
+========================================
+
+For support or questions:
+Email: juncliff44@gmail.com
+Developer: Matovu Wycliff
+Location: Uganda
+
+Thank you for using Aura PDF™!

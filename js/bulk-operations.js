@@ -3,6 +3,8 @@ class BulkOperations {
     constructor() {
         this.files = [];
         this.patterns = [];
+        this.pdfCache = new Map(); // Cache for PDF documents
+        this.maxCacheSize = 10; // Maximum number of PDFs to cache
         this.bindEvents();
     }
     
@@ -34,7 +36,13 @@ class BulkOperations {
         document.getElementById('nameSuffix').addEventListener('input', () => this.updatePreview());
         
         // Execute buttons
-        document.getElementById('executeBulkRename').addEventListener('click', () => this.executeBulkRename());
+        document.getElementById('executeBulkRename').addEventListener('click', () => {
+            console.log('Execute bulk rename button clicked!');
+            const button = document.getElementById('executeBulkRename');
+            console.log('Button disabled state:', button.disabled);
+            console.log('Button text:', button.textContent);
+            this.executeBulkRename();
+        });
         document.getElementById('executeSplit').addEventListener('click', () => this.executeSplit());
         
         // Reset button
@@ -43,7 +51,7 @@ class BulkOperations {
         // Split modal events
         document.getElementById('splitFile').addEventListener('change', () => this.updateSplitInfo());
         document.getElementById('pagesPerFile').addEventListener('input', () => this.updateSplitInfo());
-        document.getElementById('selectOutputDir').addEventListener('click', () => this.selectOutputDirectory());
+        document.getElementById('createZip').addEventListener('change', () => this.updateSplitInfo());
     }
     
     // Bulk Rename Modal
@@ -459,6 +467,71 @@ class BulkOperations {
         }
     }
     
+    async generateActualNewNamesOptimized(strategy) {
+        try {
+            console.log('Generating optimized actual new names for execution with strategy:', strategy);
+            
+            // Safety check - ensure we have files
+            if (!this.files || this.files.length === 0) {
+                console.log('No files to process');
+                return [];
+            }
+            
+            const newNames = [];
+            
+            // Process files in batches for better performance
+            const batchSize = 10;
+            
+            for (let i = 0; i < this.files.length; i += batchSize) {
+                const batch = this.files.slice(i, i + batchSize);
+                const batchNames = [];
+                
+                // Process batch in parallel
+                const batchPromises = batch.map(async (file, batchIndex) => {
+                    const fileIndex = i + batchIndex;
+                    
+                    if (!file || !file.basename) {
+                        return 'unnamed';
+                    }
+                    
+                    let newName = '';
+                    
+                    switch (strategy) {
+                        case 'pattern':
+                            newName = await this.generateActualPatternName(file, fileIndex);
+                            break;
+                        case 'sequence':
+                            newName = this.generateSequenceName(file, fileIndex);
+                            break;
+                        case 'prefix':
+                            newName = this.generatePrefixName(file);
+                            break;
+                        default:
+                            newName = file.basename;
+                    }
+                    
+                    return newName || file.basename;
+                });
+                
+                // Wait for batch to complete
+                const batchResults = await Promise.all(batchPromises);
+                newNames.push(...batchResults);
+                
+                // Update progress
+                const progress = Math.round(((i + batchSize) / this.files.length) * 100);
+                this.updateProgressBar(Math.min(progress, 90), `Generating names: ${Math.min(i + batchSize, this.files.length)}/${this.files.length}`);
+            }
+            
+            console.log('Generated optimized actual names:', newNames);
+            return newNames;
+            
+        } catch (error) {
+            console.error('Error in generateActualNewNamesOptimized:', error);
+            // Safe fallback - return original filenames
+            return this.files.map(file => file.basename || 'unnamed');
+        }
+    }
+    
     async generateActualPatternName(file, fileIndex) {
         try {
             const patternIndex = parseInt(document.getElementById('selectedPattern')?.value || '0');
@@ -607,9 +680,20 @@ class BulkOperations {
         try {
             if (!position || !file.buffer) return '';
             
-            // Load PDF and extract text from specific position
-            const uint8Array = new Uint8Array(file.buffer);
-            const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
+            // Use cached PDF document if available to avoid reloading
+            let pdf = this.getCachedPdf(file);
+            if (!pdf) {
+                const uint8Array = new Uint8Array(file.buffer);
+                pdf = await pdfjsLib.getDocument({ 
+                    data: uint8Array,
+                    // Optimize for text extraction
+                    disableFontFace: true,
+                    disableRange: true,
+                    disableStream: true
+                }).promise;
+                // Cache the PDF document for reuse
+                this.setCachedPdf(file, pdf);
+            }
             
             if (position.page > pdf.numPages) {
                 console.warn(`Pattern targets page ${position.page} but PDF only has ${pdf.numPages} pages`);
@@ -637,7 +721,30 @@ class BulkOperations {
             
             const extractedItems = [];
             
-            textContent.items.forEach(item => {
+            // Optimize text extraction by filtering items first
+            const relevantItems = textContent.items.filter(item => {
+                const transform = item.transform;
+                const x = transform[4];
+                const y = viewport.height - transform[5];
+                const width = item.width;
+                const height = item.height;
+                
+                const itemRect = {
+                    left: x,
+                    top: y - height,
+                    right: x + width,
+                    bottom: y
+                };
+                
+                // Quick intersection check
+                return !(selectionRect.right < itemRect.left || 
+                        selectionRect.left > itemRect.right || 
+                        selectionRect.bottom < itemRect.top || 
+                        selectionRect.top > itemRect.bottom);
+            });
+            
+            // Process only relevant items
+            relevantItems.forEach(item => {
                 const transform = item.transform;
                 const x = transform[4];
                 const y = viewport.height - transform[5];
@@ -703,18 +810,13 @@ class BulkOperations {
     }
     
     async executeBulkRename() {
+        console.log('=== BULK RENAME STARTED ===');
         const strategy = document.querySelector('input[name="namingStrategy"]:checked').value;
         
-        // For actual execution, we need to use real pattern extraction, not preview placeholders
+        // Performance monitoring
+        const startTime = performance.now();
         console.log('Executing bulk rename with strategy:', strategy);
-        const newNames = await this.generateActualNewNames(strategy);
-        
-        console.log('Generated new names for execution:', newNames);
-        
-        if (newNames.length !== this.files.length) {
-            alert('Error generating new names');
-            return;
-        }
+        console.log(`Processing ${this.files.length} files`);
         
         // Confirm action
         if (!confirm(`Are you sure you want to rename ${this.files.length} files?\n\nFiles will be renamed in their original location.`)) {
@@ -723,70 +825,107 @@ class BulkOperations {
         
         // Show progress bar
         this.showProgressBar();
+        this.setRenameStatus('Preparing bulk rename...', true);
+        
+        // Pre-generate all new names in batches for better performance
+        const nameGenStart = performance.now();
+        const newNames = await this.generateActualNewNamesOptimized(strategy);
+        const nameGenTime = performance.now() - nameGenStart;
+        console.log(`Name generation took: ${nameGenTime.toFixed(2)}ms`);
+        
+        console.log('Generated new names for execution:', newNames);
+        
+        if (newNames.length !== this.files.length) {
+            alert('Error generating new names');
+            this.hideProgressBar();
+            return;
+        }
+        
         this.setRenameStatus('Renaming files in their original location...', true);
         
         let successCount = 0;
         let errorCount = 0;
         const errors = [];
         
-        // Add progress tracking
+        // Process files in batches for better performance
+        const batchSize = 5; // Process 5 files at a time
         const totalFiles = this.files.length;
         let processedFiles = 0;
         
-        for (let i = 0; i < this.files.length; i++) {
-            const file = this.files[i];
-            const newName = newNames[i];
+        for (let i = 0; i < this.files.length; i += batchSize) {
+            const batch = this.files.slice(i, i + batchSize);
+            const batchNames = newNames.slice(i, i + batchSize);
             
-            // Update progress
-            processedFiles++;
-            const progress = Math.round((processedFiles / totalFiles) * 100);
-            this.updateProgressBar(progress, `Processing file ${processedFiles}/${totalFiles}: ${file.name}`);
-            this.setRenameStatus(`Processing file ${processedFiles}/${totalFiles} (${progress}%): ${file.name}`, true);
-            
-            console.log(`File ${i}: "${file.basename}" -> "${newName}"`);
-            
-            if (newName === file.basename) {
-                console.log(`Skipping file ${i}: name unchanged`);
-                continue; // Skip if name hasn't changed
-            }
-            
-            try {
-                const dir = this.getDirName(file.path);
-                const newPath = `${dir}/${newName}.pdf`;
+            // Process batch in parallel
+            const batchPromises = batch.map(async (file, batchIndex) => {
+                const fileIndex = i + batchIndex;
+                const newName = batchNames[batchIndex];
                 
-                // Check if target file already exists in the filesystem
-                try {
-                    const { ipcRenderer } = require('electron');
-                    const fileExists = await ipcRenderer.invoke('file-exists', newPath);
-                    
-                    if (fileExists) {
-                        errors.push(`${file.name}: Target file already exists`);
-                        errorCount++;
-                        continue;
-                    }
-                } catch (error) {
-                    console.error('Error checking file existence:', error);
-                    // Continue with rename attempt
+                console.log(`File ${fileIndex}: "${file.basename}" -> "${newName}"`);
+                
+                if (newName === file.basename) {
+                    console.log(`Skipping file ${fileIndex}: name unchanged`);
+                    return { success: true, skipped: true };
                 }
                 
-                const { ipcRenderer } = require('electron');
-                const result = await ipcRenderer.invoke('rename-file', file.path, newPath);
-                
+                try {
+                    const dir = this.getDirName(file.path);
+                    const newPath = `${dir}/${newName}.pdf`;
+                    
+                    // Check if target file already exists in the filesystem
+                    try {
+                        const { ipcRenderer } = require('electron');
+                        const fileExists = await ipcRenderer.invoke('file-exists', newPath);
+                        
+                        if (fileExists) {
+                            return { success: false, error: `${file.name}: Target file already exists` };
+                        }
+                    } catch (error) {
+                        console.error('Error checking file existence:', error);
+                        // Continue with rename attempt
+                    }
+                    
+                    const { ipcRenderer } = require('electron');
+                    const result = await ipcRenderer.invoke('rename-file', file.path, newPath);
+                    
+                    if (result.success) {
+                        file.path = newPath;
+                        file.name = `${newName}.pdf`;
+                        file.basename = newName;
+                        return { success: true, skipped: false };
+                    } else {
+                        return { success: false, error: `${file.name}: ${result.error}` };
+                    }
+                    
+                } catch (error) {
+                    console.error('Error renaming file:', error);
+                    return { success: false, error: `${file.name}: ${error.message}` };
+                }
+            });
+            
+            // Wait for batch to complete
+            const batchResults = await Promise.all(batchPromises);
+            
+            // Process results
+            batchResults.forEach(result => {
                 if (result.success) {
-                    file.path = newPath;
-                    file.name = `${newName}.pdf`;
-                    file.basename = newName;
-                    successCount++;
+                    if (!result.skipped) {
+                        successCount++;
+                    }
                 } else {
-                    errors.push(`${file.name}: ${result.error}`);
+                    errors.push(result.error);
                     errorCount++;
                 }
-                
-            } catch (error) {
-                console.error('Error renaming file:', error);
-                errors.push(`${file.name}: ${error.message}`);
-                errorCount++;
-            }
+            });
+            
+            // Update progress
+            processedFiles += batch.length;
+            const progress = Math.round((processedFiles / totalFiles) * 100);
+            this.updateProgressBar(progress, `Processing files ${processedFiles}/${totalFiles} (${progress}%)`);
+            this.setRenameStatus(`Processing files ${processedFiles}/${totalFiles} (${progress}%): Batch ${Math.ceil((i + batchSize) / batchSize)}`, true);
+            
+            // Small delay to prevent UI blocking
+            await new Promise(resolve => setTimeout(resolve, 50));
         }
         
         this.setRenameStatus('Complete', false);
@@ -794,13 +933,21 @@ class BulkOperations {
         // Hide progress bar
         this.hideProgressBar();
         
-        // Show results
-        let message = `Bulk rename completed!\n\nSuccessfully renamed: ${successCount} files`;
-        if (errorCount > 0) {
-            message += `\nErrors: ${errorCount} files\n\n` + errors.join('\n');
-        }
+        // Performance summary
+        const totalTime = performance.now() - startTime;
+        const avgTimePerFile = totalTime / this.files.length;
+        console.log(`Bulk rename completed in ${totalTime.toFixed(2)}ms`);
+        console.log(`Average time per file: ${avgTimePerFile.toFixed(2)}ms`);
+        console.log(`Files per second: ${(1000 / avgTimePerFile).toFixed(2)}`);
+        console.log('=== BULK RENAME COMPLETED ===');
         
-        alert(message);
+        // Show completion popup
+        console.log('About to show completion popup:', { successCount, errorCount, errors: errors.length, totalTime, avgTimePerFile });
+        
+        // Show a simple alert first to confirm completion
+        alert(`Bulk rename completed!\n\nSuccessfully renamed: ${successCount} files\nErrors: ${errorCount} files\nTotal time: ${(totalTime / 1000).toFixed(2)}s`);
+        
+        this.showCompletionPopup(successCount, errorCount, errors, totalTime, avgTimePerFile);
         
         // Refresh UI and file list to avoid duplicate rename attempts
         if (window.app) {
@@ -812,7 +959,8 @@ class BulkOperations {
         // Clear all form fields after successful bulk rename
         this.clearBulkRenameForm();
         
-        this.closeBulkRenameModal();
+        // Don't close the modal immediately, let user see the completion popup
+        // this.closeBulkRenameModal();
     }
     
     setRenameStatus(message, loading = false) {
@@ -846,12 +994,234 @@ class BulkOperations {
         const progressText = document.getElementById('progressText');
         
         if (progressFill) {
-            progressFill.style.width = `${progress}%`;
+            progressFill.style.width = `${Math.min(progress, 100)}%`;
+            progressFill.style.transition = 'width 0.3s ease';
         }
         
         if (progressText) {
             progressText.textContent = text;
         }
+        
+        // Update document title to show progress
+        if (progress > 0 && progress < 100) {
+            document.title = `Aura PDF - ${progress}% Complete`;
+        } else if (progress >= 100) {
+            document.title = 'Aura PDF - Complete';
+        }
+    }
+    
+    showCompletionPopup(successCount, errorCount, errors, totalTime, avgTimePerFile) {
+        console.log('showCompletionPopup called with:', { successCount, errorCount, errors: errors.length, totalTime, avgTimePerFile });
+        
+        // Create completion popup modal
+        const modal = document.createElement('div');
+        modal.className = 'completion-modal';
+        modal.innerHTML = `
+            <div class="completion-content">
+                <div class="completion-header">
+                    <div class="completion-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h3>Bulk Rename Complete!</h3>
+                </div>
+                <div class="completion-body">
+                    <div class="completion-stats">
+                        <div class="stat-item success">
+                            <i class="fas fa-check"></i>
+                            <span>Successfully renamed: ${successCount} files</span>
+                        </div>
+                        ${errorCount > 0 ? `
+                        <div class="stat-item error">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span>Errors: ${errorCount} files</span>
+                        </div>
+                        ` : ''}
+                        <div class="stat-item performance">
+                            <i class="fas fa-clock"></i>
+                            <span>Total time: ${(totalTime / 1000).toFixed(2)}s</span>
+                        </div>
+                        <div class="stat-item performance">
+                            <i class="fas fa-tachometer-alt"></i>
+                            <span>Speed: ${(1000 / avgTimePerFile).toFixed(1)} files/sec</span>
+                        </div>
+                    </div>
+                    ${errorCount > 0 ? `
+                    <div class="error-details">
+                        <h4>Error Details:</h4>
+                        <div class="error-list">
+                            ${errors.slice(0, 5).map(error => `<div class="error-item">${error}</div>`).join('')}
+                            ${errors.length > 5 ? `<div class="error-item">... and ${errors.length - 5} more errors</div>` : ''}
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+                <div class="completion-footer">
+                    <button class="btn btn-primary" onclick="this.closest('.completion-modal').remove(); document.getElementById('bulkRenameModal').classList.remove('active');">
+                        <i class="fas fa-check"></i> Got it!
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Add modal styles
+        const style = document.createElement('style');
+        style.textContent = `
+            .completion-modal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.7);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 99999;
+                animation: fadeIn 0.3s ease;
+            }
+            
+            .completion-content {
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+                max-width: 500px;
+                width: 90%;
+                max-height: 80vh;
+                overflow-y: auto;
+                animation: slideIn 0.3s ease;
+            }
+            
+            .completion-header {
+                text-align: center;
+                padding: 30px 30px 20px;
+                border-bottom: 1px solid #eee;
+            }
+            
+            .completion-icon {
+                font-size: 48px;
+                color: #28a745;
+                margin-bottom: 15px;
+            }
+            
+            .completion-header h3 {
+                margin: 0;
+                color: #333;
+                font-size: 24px;
+                font-weight: 600;
+            }
+            
+            .completion-body {
+                padding: 20px 30px;
+            }
+            
+            .completion-stats {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                margin-bottom: 20px;
+            }
+            
+            .stat-item {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 10px;
+                border-radius: 8px;
+                font-weight: 500;
+            }
+            
+            .stat-item.success {
+                background: #d4edda;
+                color: #155724;
+            }
+            
+            .stat-item.error {
+                background: #f8d7da;
+                color: #721c24;
+            }
+            
+            .stat-item.performance {
+                background: #d1ecf1;
+                color: #0c5460;
+            }
+            
+            .stat-item i {
+                font-size: 16px;
+            }
+            
+            .error-details {
+                margin-top: 20px;
+            }
+            
+            .error-details h4 {
+                margin: 0 0 10px 0;
+                color: #721c24;
+                font-size: 16px;
+            }
+            
+            .error-list {
+                max-height: 150px;
+                overflow-y: auto;
+                border: 1px solid #f5c6cb;
+                border-radius: 6px;
+                padding: 10px;
+                background: #f8f9fa;
+            }
+            
+            .error-item {
+                padding: 5px 0;
+                font-size: 14px;
+                color: #721c24;
+                border-bottom: 1px solid #f5c6cb;
+            }
+            
+            .error-item:last-child {
+                border-bottom: none;
+            }
+            
+            .completion-footer {
+                padding: 20px 30px 30px;
+                text-align: center;
+                border-top: 1px solid #eee;
+            }
+            
+            .completion-footer .btn {
+                padding: 12px 30px;
+                font-size: 16px;
+                font-weight: 600;
+            }
+            
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            
+            @keyframes slideIn {
+                from { 
+                    opacity: 0;
+                    transform: translateY(-30px) scale(0.95);
+                }
+                to { 
+                    opacity: 1;
+                    transform: translateY(0) scale(1);
+                }
+            }
+        `;
+        
+        document.head.appendChild(style);
+        document.body.appendChild(modal);
+        console.log('Completion popup modal added to DOM');
+        console.log('Modal element:', modal);
+        console.log('Modal parent:', modal.parentNode);
+        console.log('Modal display style:', window.getComputedStyle(modal).display);
+        
+        // Auto-remove after 10 seconds if not manually closed
+        setTimeout(() => {
+            if (modal.parentNode) {
+                console.log('Auto-removing completion popup after 10 seconds');
+                modal.remove();
+            }
+        }, 10000);
     }
     
     // Split PDF Modal
@@ -900,9 +1270,10 @@ class BulkOperations {
                 <p><strong>Pages per File:</strong> ${pagesPerFile}</p>
                 <p><strong>Number of Output Files:</strong> ${numberOfFiles}</p>
                 <p><strong>File Names:</strong> ${file.basename}_part01.pdf, ${file.basename}_part02.pdf, ...</p>
+                <p><strong>Output Location:</strong> Downloads folder (automatic)</p>
             `;
             
-            executeBtn.disabled = !document.getElementById('outputDirectory').value;
+            executeBtn.disabled = false;
         } else {
             splitInfo.innerHTML = '';
             executeBtn.disabled = true;
@@ -927,8 +1298,7 @@ class BulkOperations {
     async executeSplit() {
         const fileIndex = parseInt(document.getElementById('splitFile').value);
         const pagesPerFile = parseInt(document.getElementById('pagesPerFile').value) || 1;
-        const outputDir = document.getElementById('outputDirectory').value;
-        const createZip = document.getElementById('createZipFile').checked;
+        const createZip = document.getElementById('createZip').checked;
         
         if (fileIndex < 0 || !this.files[fileIndex]) {
             alert('Please select a file to split');
@@ -937,11 +1307,6 @@ class BulkOperations {
         
         if (pagesPerFile < 1) {
             alert('Pages per file must be at least 1');
-            return;
-        }
-        
-        if (!outputDir) {
-            alert('Please select an output directory');
             return;
         }
         
@@ -956,29 +1321,26 @@ class BulkOperations {
         
         try {
             const { ipcRenderer } = require('electron');
-            const result = await ipcRenderer.invoke('split-pdf', file.path, outputDir, pagesPerFile, createZip);
+            
+            // Use the backend split functionality without ZIP creation
+            const result = await ipcRenderer.invoke('split-pdf', file.path, null, pagesPerFile, false); // createZip = false
             
             if (result.success) {
                 this.setSplitStatus('Complete', false);
                 
-                if (createZip && result.zipPath) {
-                    const downloadResult = await ipcRenderer.invoke('download-file', result.zipPath, `${file.basename}_split.zip`);
-                    
-                    if (downloadResult.success && !downloadResult.canceled) {
-                        alert(`PDF split successfully!\n\n` +
-                              `Created ${result.totalFiles} files and packaged into ZIP.\n` +
-                              `ZIP downloaded to: ${downloadResult.path}`);
-                    } else if (!downloadResult.canceled) {
-                        alert(`PDF split successfully!\n\n` +
-                              `Created ${result.totalFiles} files.\n` +
-                              `ZIP created at: ${result.zipPath}\n` +
-                              `Error downloading: ${downloadResult.error}`);
+                // Open the output folder automatically
+                if (result.outputDir) {
+                    try {
+                        await ipcRenderer.invoke('open-folder', result.outputDir);
+                    } catch (error) {
+                        console.error('Error opening folder:', error);
                     }
-                } else {
-                    alert(`PDF split successfully!\n\n` +
-                          `Created ${result.totalFiles} files in:\n${outputDir}\n\n` +
-                          `Files: ${result.results.map(r => r.fileName).join(', ')}`);
                 }
+                
+                alert(`PDF split successfully!\n\n` +
+                      `Created ${result.totalFiles} files.\n` +
+                      `Files saved in: ${result.outputDir}\n\n` +
+                      `The output folder has been opened for you.`);
                 
                 this.closeSplitModal();
             } else {
@@ -1018,6 +1380,39 @@ class BulkOperations {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    // PDF Cache Management
+    getCachedPdf(file) {
+        const fileKey = file.path || file.name;
+        return this.pdfCache.get(fileKey);
+    }
+    
+    setCachedPdf(file, pdf) {
+        const fileKey = file.path || file.name;
+        
+        // If cache is full, remove oldest entry
+        if (this.pdfCache.size >= this.maxCacheSize) {
+            const firstKey = this.pdfCache.keys().next().value;
+            this.pdfCache.delete(firstKey);
+        }
+        
+        this.pdfCache.set(fileKey, pdf);
+    }
+    
+    clearPdfCache() {
+        this.pdfCache.clear();
+    }
+    
+    // Clean up PDF cache when files are removed
+    cleanupPdfCache() {
+        const currentFilePaths = new Set(this.files.map(file => file.path || file.name));
+        
+        for (const [fileKey, pdf] of this.pdfCache.entries()) {
+            if (!currentFilePaths.has(fileKey)) {
+                this.pdfCache.delete(fileKey);
+            }
+        }
     }
 }
 
