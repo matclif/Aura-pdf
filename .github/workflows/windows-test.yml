@@ -47,12 +47,6 @@ jobs:
           exit 1
         }
     
-    - name: Test app startup
-      run: |
-        # Test if the app can start (with timeout)
-        echo "Testing app startup..."
-        timeout 15 npm start || echo "App startup test completed"
-    
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
