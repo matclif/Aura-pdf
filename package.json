@@ -45,9 +45,8 @@
   "build": {
     "appId": "com.aura.pdf",
     "productName": "Aura PDF™",
-    "electronRebuildConfig": {
-      "prebuild": false
-    },
+    "npmRebuild": false,
+    "nodeGypRebuild": false,
     "directories": {
       "output": "dist"
     },
