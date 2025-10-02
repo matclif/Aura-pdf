@@ -84,8 +84,7 @@
       "requestedExecutionLevel": "asInvoker",
       "verifyUpdateCodeSignature": false,
       "icon": "assets/icons/aura-icon.png",
-      "legalTrademarks": "Aura PDF™ is a trademark of Wycliff Matovu",
-      "publisherName": "Wycliff Matovu"
+      "legalTrademarks": "Aura PDF™ is a trademark of Wycliff Matovu"
     },
     "nsis": {
       "oneClick": false,
@@ -100,11 +99,6 @@
       "perMachine": false,
       "warningsAsErrors": false,
       "uninstallDisplayName": "Aura PDF™",
-      "installerIcon": null,
-      "uninstallerIcon": null,
-      "installerHeaderIcon": "assets/icons/aura-icon.png",
-      "displayLanguageSelector": false,
-      "include": null,
       "guid": "aura-pdf-app-2.0.0"
     },
     "mac": {
