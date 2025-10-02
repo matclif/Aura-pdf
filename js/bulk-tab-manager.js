@@ -225,24 +225,20 @@ class BulkTabManager {
                 console.log('Bulk Tab: File result buffer length:', fileResult.buffer ? fileResult.buffer.length : 'null');
                 console.log('Bulk Tab: File result buffer:', fileResult.buffer);
                 
-                // Clone the buffer to prevent detachment issues
+                // Use BufferManager for centralized buffer handling
                 let buffer;
-                if (fileResult.buffer instanceof ArrayBuffer) {
-                    buffer = new Uint8Array(fileResult.buffer.slice(0));
-                } else if (fileResult.buffer instanceof Uint8Array) {
-                    buffer = new Uint8Array(fileResult.buffer.slice(0));
-                } else if (fileResult.buffer && typeof fileResult.buffer === 'object' && fileResult.buffer.buffer) {
-                    // Handle case where buffer might be a TypedArray with a buffer property
-                    buffer = new Uint8Array(fileResult.buffer.buffer.slice(0));
-                } else if (Buffer.isBuffer(fileResult.buffer)) {
-                    // Handle Node.js Buffer objects
-                    buffer = new Uint8Array(fileResult.buffer);
-                } else if (Array.isArray(fileResult.buffer)) {
-                    // Handle array format from read-pdf-file handler
-                    buffer = new Uint8Array(fileResult.buffer);
+                if (window.bufferManager) {
+                    // Let BufferManager handle the normalization
+                    try {
+                        buffer = window.bufferManager.setBuffer({ path: filePath }, fileResult.buffer);
+                        console.log('Bulk Tab: Buffer managed by BufferManager');
+                    } catch (error) {
+                        console.error('Bulk Tab: BufferManager failed, falling back to manual handling:', error);
+                        buffer = this._normalizeBuffer(fileResult.buffer);
+                    }
                 } else {
-                    console.error('Bulk Tab: Invalid file buffer format. Buffer:', fileResult.buffer);
-                    throw new Error('Invalid file buffer format');
+                    console.warn('Bulk Tab: BufferManager not available, using fallback');
+                    buffer = this._normalizeBuffer(fileResult.buffer);
                 }
                 
                 const file = {
@@ -260,12 +256,17 @@ class BulkTabManager {
                 // Get page count from PDF (create a separate copy for this)
                 try {
                     if (window.pdfjsLib) {
+                        console.log('Bulk Tab: PDF.js available, getting page count for:', file.name);
                         const pageCountBuffer = new Uint8Array(buffer.slice(0));
                         const pdf = await window.pdfjsLib.getDocument({ data: pageCountBuffer }).promise;
                         file.pages = pdf.numPages;
+                        console.log('Bulk Tab: Page count determined:', file.pages, 'pages');
+                    } else {
+                        console.warn('Bulk Tab: PDF.js not available, setting pages to 0 for:', file.name);
+                        file.pages = 0;
                     }
                 } catch (error) {
-                    console.error('Error getting page count:', error);
+                    console.error('Bulk Tab: Error getting page count for', file.name, ':', error);
                     file.pages = 0;
                 }
 
@@ -761,34 +762,42 @@ class BulkTabManager {
         try {
             console.log('Bulk Tab: Extracting text from position:', position);
             
+            // Use TextExtractionCache if available
+            if (window.textExtractionCache) {
+                try {
+                    const extractedText = await window.textExtractionCache.extractTextFromPosition(file, position);
+                    console.log('Bulk Tab: Extracted text using cache:', extractedText);
+                    return extractedText;
+                } catch (cacheError) {
+                    console.warn('Bulk Tab: TextExtractionCache failed, using fallback:', cacheError);
+                }
+            }
+            
+            // Fallback to direct extraction
             if (!window.pdfjsLib) {
                 console.error('Bulk Tab: PDF.js not available');
                 return null;
             }
 
-            // Ensure we have a valid buffer that won't be detached
+            // Get buffer from BufferManager if available
             let buffer = file.buffer;
+            if (window.bufferManager) {
+                buffer = window.bufferManager.getBuffer(file) || buffer;
+            }
+            
+            if (!buffer) {
+                console.error('Bulk Tab: No buffer available for text extraction');
+                return null;
+            }
+            
+            // Ensure buffer is Uint8Array
             let uint8Array;
-            
-            console.log('Bulk Tab: Buffer type in extractTextFromPosition:', buffer ? buffer.constructor.name : 'null');
-            console.log('Bulk Tab: Buffer length in extractTextFromPosition:', buffer ? buffer.length : 'null');
-            
-            if (buffer instanceof ArrayBuffer) {
-                // Create a copy to prevent detachment issues
-                const bufferCopy = buffer.slice(0);
-                uint8Array = new Uint8Array(bufferCopy);
-                console.log('Bulk Tab: Created Uint8Array from ArrayBuffer, length:', uint8Array.length);
-            } else if (buffer instanceof Uint8Array) {
-                // If it's already a Uint8Array, create a copy
-                uint8Array = new Uint8Array(buffer.slice(0));
-                console.log('Bulk Tab: Created Uint8Array copy, length:', uint8Array.length);
-            } else if (buffer && buffer.buffer) {
-                // If it's a TypedArray, get the underlying buffer and copy it
-                const bufferCopy = buffer.buffer.slice(0);
-                uint8Array = new Uint8Array(bufferCopy);
-                console.log('Bulk Tab: Created Uint8Array from TypedArray, length:', uint8Array.length);
+            if (buffer instanceof Uint8Array) {
+                uint8Array = buffer;
+            } else if (buffer instanceof ArrayBuffer) {
+                uint8Array = new Uint8Array(buffer);
             } else {
-                console.error('Bulk Tab: Invalid buffer format');
+                console.error('Bulk Tab: Invalid buffer format for text extraction');
                 return null;
             }
 
@@ -968,9 +977,19 @@ class BulkTabManager {
             return;
         }
         
+        // Preserve current selection state before recreating HTML
+        const currentSelections = new Set();
+        const existingCheckboxes = container.querySelectorAll('input[name="selectedPatterns"]:checked');
+        existingCheckboxes.forEach(checkbox => {
+            currentSelections.add(checkbox.value);
+        });
+        
+        console.log('Bulk Tab: Preserving selections:', Array.from(currentSelections));
+        
         let html = '';
         patterns.forEach((pattern, index) => {
-            const isChecked = index === 0 ? 'checked' : ''; // Check the first pattern by default
+            // Check if this pattern was previously selected, or if it's the first pattern and no selections exist
+            const isChecked = currentSelections.has(index.toString()) || (currentSelections.size === 0 && index === 0) ? 'checked' : '';
             html += `
                 <div class="pattern-checkbox-item">
                     <input type="checkbox" id="pattern_${index}" name="selectedPatterns" value="${index}" ${isChecked}>
@@ -1123,6 +1142,27 @@ class BulkTabManager {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    /**
+     * Normalize buffer to Uint8Array (fallback when BufferManager is not available)
+     * @private
+     */
+    _normalizeBuffer(buffer) {
+        if (buffer instanceof Uint8Array) {
+            return buffer;
+        } else if (buffer instanceof ArrayBuffer) {
+            return new Uint8Array(buffer);
+        } else if (Array.isArray(buffer)) {
+            return new Uint8Array(buffer);
+        } else if (buffer && buffer.buffer instanceof ArrayBuffer) {
+            return new Uint8Array(buffer.buffer);
+        } else if (typeof Buffer !== 'undefined' && Buffer.isBuffer(buffer)) {
+            return new Uint8Array(buffer);
+        } else {
+            console.error('Bulk Tab: Cannot normalize buffer of type:', buffer?.constructor?.name);
+            throw new Error('Invalid buffer format');
+        }
     }
 
     // Method to refresh file data if buffer is detached

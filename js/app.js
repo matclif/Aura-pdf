@@ -27,22 +27,32 @@ class AuraPDFApp {
     // Wait for PDF.js to be available
     async waitForPDFJS() {
         let attempts = 0;
-        const maxAttempts = 20; // 2 seconds max wait (reduced from 5 seconds)
+        const maxAttempts = 30; // 3 seconds max wait
         
-        while (typeof pdfjsLib === 'undefined' && attempts < maxAttempts) {
+        console.log('App: Waiting for PDF.js to load...');
+        
+        while (typeof pdfjsLib === 'undefined' && attempts < maxAttempts && !window.pdfjsLoadError) {
             await new Promise(resolve => setTimeout(resolve, 100));
             attempts++;
         }
         
         if (typeof pdfjsLib === 'undefined') {
-            console.error('PDF.js failed to load after 2 seconds');
-            this.setStatus('Warning: PDF.js not loaded - some features may not work');
+            if (window.pdfjsLoadError) {
+                console.error('App: PDF.js failed to load from all CDNs');
+                this.setStatus('Error: PDF.js failed to load - PDF features disabled');
+            } else {
+                console.error('App: PDF.js failed to load after 3 seconds');
+                this.setStatus('Warning: PDF.js not loaded - some features may not work');
+            }
+            return false;
         } else {
-            console.log('PDF.js loaded successfully');
+            console.log('App: PDF.js loaded successfully');
             // Set up PDF.js worker
             if (pdfjsLib.GlobalWorkerOptions) {
                 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                console.log('App: PDF.js worker configured');
             }
+            return true;
         }
     }
     
@@ -334,11 +344,16 @@ class AuraPDFApp {
             // Get page count from PDF
             try {
                 if (window.pdfjsLib) {
+                    console.log('App: PDF.js available, getting page count for:', file.name);
                     const pdf = await window.pdfjsLib.getDocument({ data: file.buffer }).promise;
                     file.pages = pdf.numPages;
+                    console.log('App: Page count determined:', file.pages, 'pages for', file.name);
+                } else {
+                    console.warn('App: PDF.js not available, setting pages to 0 for:', file.name);
+                    file.pages = 0;
                 }
             } catch (error) {
-                console.error('Error getting page count:', error);
+                console.error('App: Error getting page count for', file.name, ':', error);
                 file.pages = 0;
             }
 
@@ -375,11 +390,16 @@ class AuraPDFApp {
             // Get page count from PDF
             try {
                 if (window.pdfjsLib) {
+                    console.log('App: PDF.js available, getting page count for web file:', fileObj.name);
                     const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
                     fileObj.pages = pdf.numPages;
+                    console.log('App: Page count determined:', fileObj.pages, 'pages for web file', fileObj.name);
+                } else {
+                    console.warn('App: PDF.js not available, setting pages to 0 for web file:', fileObj.name);
+                    fileObj.pages = 0;
                 }
             } catch (error) {
-                console.error('Error getting page count:', error);
+                console.error('App: Error getting page count for web file', fileObj.name, ':', error);
                 fileObj.pages = 0;
             }
 

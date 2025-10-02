@@ -680,7 +680,16 @@ class BulkOperations {
         try {
             if (!position || !file.buffer) return '';
             
-            // Use cached PDF document if available to avoid reloading
+            // Use TextExtractionCache if available for optimized extraction
+            if (window.textExtractionCache) {
+                try {
+                    return await window.textExtractionCache.extractTextFromPosition(file, position);
+                } catch (cacheError) {
+                    console.warn('TextExtractionCache failed, using fallback:', cacheError);
+                }
+            }
+            
+            // Fallback: Use cached PDF document if available to avoid reloading
             let pdf = this.getCachedPdf(file);
             if (!pdf) {
                 const uint8Array = new Uint8Array(file.buffer);
@@ -869,29 +878,56 @@ class BulkOperations {
                 }
                 
                 try {
-                    const dir = this.getDirName(file.path);
-                    const newPath = `${dir}/${newName}.pdf`;
+                    // CRITICAL FIX: Use Node.js path module for robust cross-platform path handling
+                    const path = require('path');
                     
-                    // Check if target file already exists in the filesystem
-                    try {
-                        const { ipcRenderer } = require('electron');
-                        const fileExists = await ipcRenderer.invoke('file-exists', newPath);
-                        
-                        if (fileExists) {
-                            return { success: false, error: `${file.name}: Target file already exists` };
-                        }
-                    } catch (error) {
-                        console.error('Error checking file existence:', error);
-                        // Continue with rename attempt
+                    // Validate file path
+                    if (!file.path || file.path.trim() === '') {
+                        throw new Error('Invalid file path: path is empty');
                     }
                     
+                    // Extract directory using path.dirname (handles all platforms correctly)
+                    const dir = path.dirname(file.path);
+                    
+                    // Construct new path using path.join (prevents path duplication)
+                    const newPath = path.join(dir, `${newName}.pdf`);
+                    
+                    console.log(`Bulk Rename: Original path: ${file.path}`);
+                    console.log(`Bulk Rename: Directory: ${dir}`);
+                    console.log(`Bulk Rename: New name: ${newName}`);
+                    console.log(`Bulk Rename: New path: ${newPath}`);
+                    
+                    // Prevent overwriting the same file
+                    if (newPath === file.path) {
+                        console.log(`Skipping file ${fileIndex}: resolved path is identical to original`);
+                        return { success: true, skipped: true };
+                    }
+                    
+                    // Validate that directory exists
                     const { ipcRenderer } = require('electron');
+                    const fs = require('fs');
+                    
+                    // Check if source file still exists
+                    const sourceExists = await ipcRenderer.invoke('file-exists', file.path);
+                    if (!sourceExists) {
+                        return { success: false, error: `${file.name}: Source file not found` };
+                    }
+                    
+                    // Check if target file already exists
+                    const targetExists = await ipcRenderer.invoke('file-exists', newPath);
+                    if (targetExists) {
+                        return { success: false, error: `${file.name}: Target file already exists` };
+                    }
+                    
+                    // Perform rename with error handling
                     const result = await ipcRenderer.invoke('rename-file', file.path, newPath);
                     
                     if (result.success) {
+                        // Update file object with new path information
                         file.path = newPath;
                         file.name = `${newName}.pdf`;
                         file.basename = newName;
+                        console.log(`Successfully renamed: ${file.basename}`);
                         return { success: true, skipped: false };
                     } else {
                         return { success: false, error: `${file.name}: ${result.error}` };
@@ -1373,7 +1409,11 @@ class BulkOperations {
     }
     
     getDirName(path) {
-        return path.substring(0, path.lastIndexOf('/')) || path.substring(0, path.lastIndexOf('\\'));
+        // Handle both Windows and Unix path separators properly
+        const lastSlashIndex = path.lastIndexOf('/');
+        const lastBackslashIndex = path.lastIndexOf('\\');
+        const lastSeparatorIndex = Math.max(lastSlashIndex, lastBackslashIndex);
+        return lastSeparatorIndex > 0 ? path.substring(0, lastSeparatorIndex) : path;
     }
     
     escapeHtml(text) {

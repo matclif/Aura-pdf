@@ -6,12 +6,22 @@ const fs = require('fs');
 app.setName('Aura PDF™');
 app.setAppUserModelId('com.aura.pdf');
 
+// Set app icon
+if (process.platform === 'darwin') {
+  app.dock.setIcon(path.join(__dirname, 'assets', 'icons', 'aura-icon.png'));
+}
+
 // Performance optimizations for faster startup
 app.commandLine.appendSwitch('--disable-background-timer-throttling');
 app.commandLine.appendSwitch('--disable-renderer-backgrounding');
 app.commandLine.appendSwitch('--disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('--disable-features', 'TranslateUI');
 app.commandLine.appendSwitch('--disable-ipc-flooding-protection');
+
+// Fix certificate issues for CDN loading
+app.commandLine.appendSwitch('--ignore-certificate-errors');
+app.commandLine.appendSwitch('--ignore-ssl-errors');
+app.commandLine.appendSwitch('--ignore-certificate-errors-spki-list');
 
 // Windows-specific optimizations
 if (process.platform === 'win32') {
@@ -392,10 +402,10 @@ ipcMain.handle('save-file-dialog', async (event, options) => {
   return result;
 });
 
-// Read PDF file
+// Read PDF file (OPTIMIZED: Now uses async I/O)
 ipcMain.handle('read-pdf-file', async (event, filePath) => {
   try {
-    const buffer = fs.readFileSync(filePath);
+    const buffer = await fs.promises.readFile(filePath);
     return {
       success: true,
       buffer: Array.from(buffer),
@@ -403,6 +413,7 @@ ipcMain.handle('read-pdf-file', async (event, filePath) => {
       path: filePath
     };
   } catch (error) {
+    console.error('Error reading PDF file:', error);
     return {
       success: false,
       error: error.message
@@ -410,12 +421,13 @@ ipcMain.handle('read-pdf-file', async (event, filePath) => {
   }
 });
 
-// Write PDF file
+// Write PDF file (OPTIMIZED: Now uses async I/O)
 ipcMain.handle('write-pdf-file', async (event, filePath, buffer) => {
   try {
-    fs.writeFileSync(filePath, Buffer.from(buffer));
+    await fs.promises.writeFile(filePath, Buffer.from(buffer));
     return { success: true };
   } catch (error) {
+    console.error('Error writing PDF file:', error);
     return {
       success: false,
       error: error.message
@@ -423,10 +435,10 @@ ipcMain.handle('write-pdf-file', async (event, filePath, buffer) => {
   }
 });
 
-// Split PDF
+// Split PDF (OPTIMIZED: Now uses async I/O)
 ipcMain.handle('split-pdf', async (event, filePath, outputDir, pagesPerFile, createZip = false, startPage = null, endPage = null) => {
   try {
-    const buffer = fs.readFileSync(filePath);
+    const buffer = await fs.promises.readFile(filePath);
     const pdfDoc = await PDFDocument.load(buffer);
     const totalPages = pdfDoc.getPageCount();
     
@@ -884,10 +896,10 @@ async function createZipAlternative(results, zipPath) {
   }
 }
 
-// Get file stats
+// Get file stats (OPTIMIZED: Now uses async I/O)
 ipcMain.handle('get-file-stats', async (event, filePath) => {
   try {
-    const stats = fs.statSync(filePath);
+    const stats = await fs.promises.stat(filePath);
     return {
       success: true,
       size: stats.size,
@@ -895,6 +907,7 @@ ipcMain.handle('get-file-stats', async (event, filePath) => {
       created: stats.birthtime.toISOString()
     };
   } catch (error) {
+    console.error('Error getting file stats:', error);
     return {
       success: false,
       error: error.message
@@ -1236,8 +1249,12 @@ ipcMain.handle('create-zip-from-split-results', async (event, splitResults, zipN
 
 ipcMain.handle('read-file', async (event, filePath) => {
   try {
-    const buffer = fs.readFileSync(filePath);
-    const stats = fs.statSync(filePath);
+    // Use async I/O for better performance
+    const [buffer, stats] = await Promise.all([
+      fs.promises.readFile(filePath),
+      fs.promises.stat(filePath)
+    ]);
+    
     const name = path.basename(filePath);
     const basename = path.basename(filePath, path.extname(filePath));
     

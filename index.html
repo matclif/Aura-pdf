@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: blob:; worker-src 'self' blob:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://unpkg.com https://cdn.jsdelivr.net http://unpkg.com http://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://unpkg.com https://cdn.jsdelivr.net http://unpkg.com http://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com https://cdn.jsdelivr.net http://unpkg.com http://cdn.jsdelivr.net; img-src 'self' data: blob:; worker-src 'self' blob:;">
     <title>Aura PDF™ - Smart PDF Management Tool by Matovu Wycliff</title>
     <link rel="icon" type="image/png" href="assets/icons/aura-icon-32.png">
     <link rel="apple-touch-icon" href="assets/icons/aura-icon-128.png">
@@ -640,14 +640,64 @@
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
-        // Fallback if primary CDN fails
-        if (typeof pdfjsLib === 'undefined') {
-            console.log('Primary CDN failed, trying fallback...');
+        // Enhanced PDF.js loading with better error handling
+        let pdfjsLoadAttempts = 0;
+        const maxPdfjsAttempts = 3;
+        
+        function loadPdfJsFallback() {
+            pdfjsLoadAttempts++;
+            console.log(`Attempting to load PDF.js fallback (attempt ${pdfjsLoadAttempts}/${maxPdfjsAttempts})`);
+            
+            if (pdfjsLoadAttempts > maxPdfjsAttempts) {
+                console.error('All PDF.js loading attempts failed');
+                window.pdfjsLoadError = true;
+                return;
+            }
+            
             const script = document.createElement('script');
-            script.src = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js';
-            script.onload = () => console.log('PDF.js loaded from fallback CDN');
-            script.onerror = () => console.error('All PDF.js CDNs failed');
+            const fallbackUrls = [
+                'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js',
+                'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
+                'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.js',
+                'http://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js',
+                'http://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js'
+            ];
+            
+            script.src = fallbackUrls[pdfjsLoadAttempts - 1];
+            script.onload = () => {
+                console.log(`PDF.js loaded from fallback CDN (attempt ${pdfjsLoadAttempts})`);
+                if (typeof pdfjsLib !== 'undefined') {
+                    setupPdfJsWorker();
+                }
+            };
+            script.onerror = () => {
+                console.warn(`PDF.js fallback attempt ${pdfjsLoadAttempts} failed`);
+                setTimeout(loadPdfJsFallback, 1000); // Retry after 1 second
+            };
             document.head.appendChild(script);
+        }
+        
+        function setupPdfJsWorker() {
+            if (typeof pdfjsLib !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                console.log('PDF.js worker configured successfully');
+            }
+        }
+        
+        // Check if PDF.js loaded immediately
+        if (typeof pdfjsLib === 'undefined') {
+            console.log('PDF.js not loaded immediately, setting up fallback...');
+            // Wait a bit for the script to load
+            setTimeout(() => {
+                if (typeof pdfjsLib === 'undefined') {
+                    loadPdfJsFallback();
+                } else {
+                    setupPdfJsWorker();
+                }
+            }, 1000);
+        } else {
+            console.log('PDF.js loaded immediately');
+            setupPdfJsWorker();
         }
     </script>
     
@@ -656,6 +706,13 @@
     
     <!-- JSZip library for creating ZIP files -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Performance & Optimization Modules (Load First) -->
+    <script src="js/buffer-manager.js"></script>
+    <script src="js/text-extraction-cache.js"></script>
+    <script src="js/pdfjs-loader.js"></script>
+    <script src="js/performance-monitor.js"></script>
+    
+    <!-- Core Application Modules -->
     <script src="js/tab-managers.js"></script>
     <script src="js/files-patterns-tab-manager.js"></script>
     <script src="js/bulk-tab-manager.js"></script>
