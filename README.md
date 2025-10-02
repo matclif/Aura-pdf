@@ -56,10 +56,24 @@
 
 ## 📦 Installation
 
-### Windows
+### Windows (10 & 11)
+**Two installation options available:**
+
+#### Option 1: Full Installer (Recommended)
 1. Download `Aura-PDF-Setup-2.0.0.exe` from [Releases](../../releases)
-2. Run the installer
-3. Launch Aura PDF from Start Menu
+2. Run the installer (no admin rights required)
+3. Choose installation directory
+4. Launch Aura PDF from Start Menu or Desktop shortcut
+
+#### Option 2: Portable Version
+1. Download `Aura-PDF-2.0.0.exe` from [Releases](../../releases)
+2. Run directly - no installation needed!
+3. Perfect for USB drives or running without admin rights
+
+**System Requirements:**
+- Windows 10 (64-bit) or Windows 11
+- 4 GB RAM minimum (8 GB recommended)
+- 200 MB free disk space
 
 ### macOS
 1. Download `Aura-PDF-2.0.0.dmg` from [Releases](../../releases)
